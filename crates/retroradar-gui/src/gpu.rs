@@ -67,6 +67,8 @@ pub fn create(
             "adapter lacks TIMESTAMP_QUERY: GPU frame time will be unavailable, wall-clock only"
         );
     }
+    let mut limits = wgpu::Limits::default();
+    limits.max_texture_dimension_2d = adapter.limits().max_texture_dimension_2d.min(16384);
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("retroradar-gfx device"),
         required_features: if timestamps {
@@ -74,7 +76,7 @@ pub fn create(
         } else {
             wgpu::Features::empty()
         },
-        required_limits: wgpu::Limits::default(),
+        required_limits: limits,
         ..Default::default()
     }))
     .with_context(|| format!("opening device on {}", describe(&info)))?;

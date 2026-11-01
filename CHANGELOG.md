@@ -6,6 +6,11 @@ change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- Real 16K day / 8K night Earth imagery, with low/medium/high/auto startup quality,
+  GPU dimension fallback, effective resolution reporting and an explicit HD local gate.
+
 ## [0.1.1] - 2026-11-01
 
 ### Changed

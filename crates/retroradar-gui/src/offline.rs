@@ -26,16 +26,21 @@ const SIM_FRAME_S: f64 = 1.0 / 60.0;
 /// Bytes per pixel of the capture format.
 const CAPTURE_BPP: u32 = 4;
 
-pub fn build_globe(gpu: &Gpu, theme: &Theme) -> Result<GlobePass> {
+pub fn build_globe(gpu: &Gpu, theme: &Theme, quality: crate::EarthQuality) -> Result<GlobePass> {
+    let software = gpu.info.device_type == wgpu::DeviceType::Cpu;
+    let plan = quality
+        .plan(gpu.device.limits().max_texture_dimension_2d, software)
+        .map_err(anyhow::Error::msg)?;
     let lines = coast::parse(assets::COAST_50M).context("parsing embedded 50m coastlines")?;
-    let mask = coast::rasterise(&lines, assets::COAST_MASK_WIDTH, assets::COAST_MASK_LEVELS);
+    let mask = coast::rasterise(&lines, plan.coast_width, plan.coast_width.ilog2());
     GlobePass::new(
         &gpu.device,
         &gpu.queue,
         SCENE_FORMAT,
-        assets::EARTH_JPEG,
-        assets::NIGHT_JPEG,
-        gpu.info.device_type == wgpu::DeviceType::Cpu,
+        crate::earth::day_jpeg(plan.day_width),
+        crate::earth::night_jpeg(plan.night_width),
+        software,
+        plan,
         &mask,
         theme.globe.clone(),
     )
@@ -86,6 +91,7 @@ impl Offline {
         size: [u32; 2],
         low_power: bool,
         allow_software: bool,
+        earth_quality: crate::EarthQuality,
     ) -> Result<Self> {
         let instance = gpu::new_instance();
         let gpu = Arc::new(gpu::create(&instance, None, low_power, allow_software)?);
@@ -98,8 +104,13 @@ impl Offline {
         )?;
         let mut console = console;
         console.set_keys(crate::keys::KeyMap::from_config(&live.keys).map_err(anyhow::Error::msg)?);
-        console.connect(Some(live.commands.clone()), live.settings.clone());
-        let globe = build_globe(&gpu, console.theme())?;
+        let globe = build_globe(&gpu, console.theme(), earth_quality)?;
+        let mut settings = live.settings.clone();
+        settings.push((
+            "EARTH QUALITY".into(),
+            format!("{earth_quality} / {}", globe.texture_summary()),
+        ));
+        console.connect(Some(live.commands.clone()), settings);
         let renderer = Renderer::new(gpu.clone(), SCENE_FORMAT, size, globe);
         let target = gpu.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("offline-target"),
@@ -233,6 +244,7 @@ pub struct ShotOptions {
     /// `page`, `page:sub` or `all`.
     pub pages: Vec<String>,
     pub low_power: bool,
+    pub earth_quality: crate::EarthQuality,
     /// Render on a software (CPU) adapter instead of refusing to.
     pub allow_software: bool,
     /// Command lines run before the captures, e.g. `burn add apo vnb 1 0 0`.
@@ -279,6 +291,7 @@ pub fn shots(live: &Live, themes: Vec<Theme>, opts: &ShotOptions) -> Result<Vec<
         opts.size,
         opts.low_power,
         opts.allow_software,
+        opts.earth_quality,
     )?;
     let which: Vec<usize> = match &opts.theme {
         None => (0..count).collect(),
@@ -415,6 +428,7 @@ pub struct BenchOptions {
     pub theme: Option<String>,
     pub out: Option<PathBuf>,
     pub low_power: bool,
+    pub earth_quality: crate::EarthQuality,
     /// Render on a software (CPU) adapter instead of refusing to.
     pub allow_software: bool,
     /// Also measure each effect alone, to attribute cost.
@@ -475,6 +489,7 @@ pub fn bench(live: &Live, themes: Vec<Theme>, opts: &BenchOptions) -> Result<()>
             size,
             opts.low_power,
             opts.allow_software,
+            opts.earth_quality,
         )?;
         let which: Vec<usize> = match &opts.theme {
             None => (0..count).collect(),
@@ -740,6 +755,7 @@ mod tests {
             ]
             .map(String::from)
             .to_vec(),
+            earth_quality: crate::EarthQuality::Auto,
             low_power: false,
             allow_software: false,
             exec: vec![],
@@ -839,6 +855,7 @@ mod tests {
                 effects_off: false,
                 warmup_frames: 40,
                 pages: pages.iter().map(|p| (*p).to_owned()).collect(),
+                earth_quality: crate::EarthQuality::Auto,
                 low_power: false,
                 allow_software: true,
                 exec: vec![],

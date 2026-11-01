@@ -28,6 +28,7 @@ Añadido en R01:
   GPU ni escrituras. No verifica conectividad ni controladores.
 - `--kiosk`: alternancia de escenas a resolución de escritorio, sin activar `--pi`.
 - Diagnósticos en terminal, sin ficheros de log.
+- Globo HD: día 16K y noche 8K reales, niveles de calidad y reducción según GPU.
 
 Estado: implementación R01 en rama; aceptación Windows y revisión visual del
 propietario pendientes. Las pantallas y datos externos heredados no se consideran
@@ -69,6 +70,32 @@ Cerrar con Q. Tras la revisión satisfactoria, comunicar **R01 FULL GATE GREEN**
 junto con el commit mostrado. Ese resultado autoriza integrar esa versión en main
 y continuar el siguiente slice. No se integra antes de tu gate; no se abren PRs.
 Actions se limita a `cargo fmt --all -- --check`.
+
+## Calidad del globo
+
+Para máxima calidad, después del gate:
+
+```powershell
+.\target\release\retroradar.exe --earth-quality high --no-record
+```
+
+| Opción `--earth-quality` | Día | Noche |
+|---|---|---|
+| `low` | 4096 × 2048 | 2048 × 1024 |
+| `medium` | 8192 × 4096 | 4096 × 2048 |
+| `high` | 16384 × 8192 | 8192 × 4096 |
+| `auto` (por defecto) | Hasta 8192 × 4096 | Hasta 4096 × 2048 |
+
+Todos los niveles respetan el límite del dispositivo; el renderizado por software
+se limita a 2048 × 1024 de día y 1024 × 512 de noche. La terminal y SYS muestran
+la resolución efectiva. Cambiar de nivel requiere reiniciar. `high` necesita unos
+896 MiB de texturas con mipmaps, aparte de los demás recursos gráficos; `auto`
+es conservador y no mide la VRAM libre. El detalle resulta más visible al acercar
+la cámara y con el tema Modern, que muestra el mapa en color.
+
+Las imágenes NASA se han reducido desde originales mayores, sin ampliar píxeles.
+Son mapas estáticos de 2004 (día) y 2012 (noche). Véase
+[Globo HD](docs/R01-HD-EARTH-v1.0.md) para fuentes, memoria y aceptación.
 
 ## Datos y configuración
 

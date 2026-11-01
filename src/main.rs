@@ -93,6 +93,10 @@ struct Cli {
     /// Prefer the low-power (integrated) adapter.
     #[arg(long, global = true)]
     low_power: bool,
+    /// Earth textures: auto (8K hardware), low (4K), medium (8K), high (16K).
+    /// Software rendering and GPU dimension limits reduce the effective resolution.
+    #[arg(long, global = true, default_value = "auto")]
+    earth_quality: retroradar_gui::EarthQuality,
     /// For `shot` and `bench`: run on a software (CPU) graphics adapter instead of refusing to. The window
     /// always accepts one, with a warning.
     #[arg(long, global = true)]
@@ -588,6 +592,7 @@ fn main() -> Result<()> {
                 effects_off: fx_off,
                 warmup_frames: warmup,
                 pages,
+                earth_quality: cli.earth_quality,
                 low_power: cli.low_power,
                 allow_software: cli.allow_software || cli.pi,
                 exec,
@@ -618,6 +623,7 @@ fn main() -> Result<()> {
                     warmup,
                     theme,
                     out,
+                    earth_quality: cli.earth_quality,
                     low_power: cli.low_power,
                     allow_software: cli.allow_software || cli.pi,
                     breakdown,
@@ -653,6 +659,7 @@ fn main() -> Result<()> {
                         PresentArg::Immediate => retroradar_gui::Present::Immediate,
                         PresentArg::Mailbox => retroradar_gui::Present::Mailbox,
                     },
+                    earth_quality: cli.earth_quality,
                     low_power: cli.low_power,
                     max_fps: cli.max_fps.or(cli.pi.then_some(PI_MAX_FPS)),
                     exit_after_frames: g.exit_after_frames,
@@ -667,6 +674,21 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod retroradar_tests {
     use super::*;
+
+    #[test]
+    fn earth_quality_is_global_and_invalid_values_fail() {
+        let cli = Cli::try_parse_from([
+            "retroradar",
+            "shot",
+            "--out-dir",
+            "shots",
+            "--earth-quality",
+            "high",
+        ])
+        .expect("global Earth quality for captures");
+        assert_eq!(cli.earth_quality, retroradar_gui::EarthQuality::High);
+        assert!(Cli::try_parse_from(["retroradar", "--earth-quality", "invalid"]).is_err());
+    }
 
     #[test]
     fn desktop_kiosk_keeps_desktop_size_and_themes() {

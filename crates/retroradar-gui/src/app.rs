@@ -39,6 +39,7 @@ pub struct Options {
     pub fullscreen: bool,
     pub present: Present,
     pub low_power: bool,
+    pub earth_quality: crate::EarthQuality,
     /// Cap the frame rate, leaving the rest of the CPU to the engine and sources (the Pi display does).
     pub max_fps: Option<f32>,
     pub exit_after_frames: Option<u64>,
@@ -180,11 +181,18 @@ impl App {
         if let Some(cfg) = self.opts.kiosk {
             console.set_kiosk(cfg);
         }
-        console.connect(
-            Some(self.opts.live.commands.clone()),
-            self.opts.live.settings.clone(),
+        let globe = crate::offline::build_globe(&gpu, console.theme(), self.opts.earth_quality)?;
+        eprintln!(
+            "EARTH {}: {}",
+            self.opts.earth_quality,
+            globe.texture_summary()
         );
-        let globe = crate::offline::build_globe(&gpu, console.theme())?;
+        let mut settings = self.opts.live.settings.clone();
+        settings.push((
+            "EARTH QUALITY".into(),
+            format!("{} / {}", self.opts.earth_quality, globe.texture_summary()),
+        ));
+        console.connect(Some(self.opts.live.commands.clone()), settings);
         let renderer = Renderer::new(gpu.clone(), format, [config.width, config.height], globe);
         let egui_state = egui_winit::State::new(
             console.ctx.clone(),

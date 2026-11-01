@@ -31,6 +31,8 @@ try {
     Step 'Globe overlay clipping' { cargo test --locked -p retroradar-gui sun_at_the_globe_edge }
     Step 'Sky service recovery' { cargo test --locked -p retroradar-sources sky::tests }
     Step 'Horizons request scheduling' { cargo test --locked -p retroradar-sources tasks::tests }
+    Step 'Earth quality and real asset dimensions' { cargo test --locked -p retroradar-gui earth::tests }
+    Step 'HD JPEG decode (16K day / 8K night)' { cargo test --locked -p retroradar-gui high_source_decodes_without_upscaling -- --ignored --nocapture }
     Step 'Workspace regressions' { cargo test --locked --workspace --all-targets }
     Step 'Lockfile unchanged after Cargo' { git diff --exit-code -- Cargo.lock }
     Step 'Release binary' { cargo build --locked --release --bin retroradar }
@@ -39,7 +41,7 @@ try {
     if (Test-Path $portable) { throw 'Doctor unexpectedly created files.' }
     if (-not $SkipGpu) {
         try {
-            Step 'Windows GPU/window smoke (120 frames)' { & .\target\release\retroradar.exe --data-dir $portable --offline --no-record --size 1280x720 --exit-after-frames 120 }
+            Step 'Windows HD GPU/window smoke (120 frames)' { & .\target\release\retroradar.exe --data-dir $portable --offline --no-record --earth-quality high --size 1280x720 --exit-after-frames 120 }
         } finally {
             if (Test-Path $portable) { Remove-Item -Recurse -Force $portable }
         }

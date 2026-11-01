@@ -9229,6 +9229,10 @@ the following restrictions:
 | Font: Unscii-16 | http://viznut.fi/unscii/ | Public domain, per its author |
 | Font: JetBrains Mono | https://github.com/JetBrains/JetBrainsMono | SIL Open Font License 1.1 (below) |
 
+The Earth day imagery includes 4096×2048, 8192×4096 and 16384×8192 versions;
+night imagery includes 2048×1024, 4096×2048 and 8192×4096 versions. Higher
+resolutions were downsampled from NASA originals, without generated detail.
+Source URLs, dimensions and checksums are in `assets/earth/hd-textures-v1.0.json`.
 The same information, with how each asset was checked, is in `assets/LICENSES.md`.
 
 ### SIL Open Font License 1.1 (JetBrains Mono)

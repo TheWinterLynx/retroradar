@@ -12,6 +12,7 @@ mod coast;
 mod commands;
 mod console;
 mod deep;
+mod earth;
 mod flags;
 mod fonts;
 mod globe;
@@ -35,6 +36,7 @@ mod widgets;
 mod window;
 
 pub use app::{Options, Present, run};
+pub use earth::EarthQuality;
 pub use kiosk::{DEFAULT_DWELL_S as KIOSK_DEFAULT_DWELL_S, KioskConfig, Mix as KioskStyle};
 /// Check the `[keys]` table, so a bad binding fails at start-up with its reason.
 pub fn check_keys(keys: &std::collections::BTreeMap<String, Vec<String>>) -> Result<(), String> {

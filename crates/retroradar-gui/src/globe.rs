@@ -13,8 +13,6 @@ use crate::coast::MaskLevel;
 use crate::theme::{GlobeMode, GlobeStyle};
 
 /// Earth equatorial radius, km (WGS-84): the scene's unit of length.
-/// Widest Earth texture used on a software adapter, pixels.
-const SOFTWARE_TEXTURE_MAX_W: u32 = 2048;
 pub(crate) const EARTH_RADIUS_KM: f32 = 6378.137;
 
 /// Radial exaggeration steps for the orbit; always labelled in the panel title.
@@ -285,28 +283,63 @@ fn upload_mips(
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
+    // Bound each staging upload: a 16K RGBA base level is 512 MiB, larger
+    // than the default max_buffer_size on some otherwise capable adapters.
+    const MAX_UPLOAD_BYTES: u32 = 16 * 1024 * 1024;
     for (level, (mw, mh, data)) in mips.iter().enumerate() {
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &tex,
-                mip_level: level as u32,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            data,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(mw * bpp),
-                rows_per_image: Some(*mh),
-            },
-            wgpu::Extent3d {
-                width: *mw,
-                height: *mh,
-                depth_or_array_layers: 1,
-            },
-        );
+        let row_bytes = mw * bpp;
+        let rows_per_upload = (MAX_UPLOAD_BYTES / row_bytes).max(1);
+        for y in (0..*mh).step_by(rows_per_upload as usize) {
+            let rows = rows_per_upload.min(mh - y);
+            let start = (y * row_bytes) as usize;
+            let end = ((y + rows) * row_bytes) as usize;
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &tex,
+                    mip_level: level as u32,
+                    origin: wgpu::Origin3d { x: 0, y, z: 0 },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &data[start..end],
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(row_bytes),
+                    rows_per_image: Some(rows),
+                },
+                wgpu::Extent3d {
+                    width: *mw,
+                    height: rows,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
     }
     tex.create_view(&wgpu::TextureViewDescriptor::default())
+}
+
+fn fit_texture(img: image::RgbaImage, width: u32, device_max: u32) -> Result<image::RgbaImage> {
+    ensure!(
+        width >= 2 && width <= device_max,
+        "Earth texture width exceeds GPU capability"
+    );
+    ensure!(
+        img.width() == img.height() * 2,
+        "Earth texture must be a global 2:1 equirectangular image"
+    );
+    ensure!(
+        img.width() >= width,
+        "Earth texture source has insufficient native resolution"
+    );
+    Ok(if img.width() == width {
+        img
+    } else {
+        image::imageops::resize(
+            &img,
+            width,
+            width / 2,
+            image::imageops::FilterType::Triangle,
+        )
+    })
 }
 
 pub struct GlobePass {
@@ -320,35 +353,31 @@ pub struct GlobePass {
     orbit_segments: u32,
     orbit_key: Option<u64>,
     draw_marker: bool,
+    texture_plan: crate::earth::TexturePlan,
 }
 
 impl GlobePass {
     #[allow(clippy::too_many_arguments)]
     /// `earth_jpeg` is the colour texture and `night_jpeg` the city lights; `mask` is the coastline mip chain.
-    pub fn new(
+    pub(crate) fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target_format: wgpu::TextureFormat,
         earth_jpeg: &[u8],
         night_jpeg: &[u8],
         software: bool,
+        texture_plan: crate::earth::TexturePlan,
         mask: &[MaskLevel],
         style: GlobeStyle,
     ) -> Result<Self> {
         let img = image::load_from_memory_with_format(earth_jpeg, image::ImageFormat::Jpeg)
             .context("decoding embedded Earth texture")?
             .to_rgba8();
-        // A CPU rasteriser pays for every texel it touches: use the half-size picture.
-        let img = if software && img.width() > SOFTWARE_TEXTURE_MAX_W {
-            image::imageops::resize(
-                &img,
-                SOFTWARE_TEXTURE_MAX_W,
-                img.height() * SOFTWARE_TEXTURE_MAX_W / img.width(),
-                image::imageops::FilterType::Triangle,
-            )
-        } else {
-            img
-        };
+        let img = fit_texture(
+            img,
+            texture_plan.day_width,
+            device.limits().max_texture_dimension_2d,
+        )?;
         let (iw, ih) = img.dimensions();
         ensure!(
             iw >= 2 && ih >= 2,
@@ -365,6 +394,11 @@ impl GlobePass {
         let night = image::load_from_memory_with_format(night_jpeg, image::ImageFormat::Jpeg)
             .context("decoding embedded night-lights texture")?
             .to_rgba8();
+        let night = fit_texture(
+            night,
+            texture_plan.night_width,
+            device.limits().max_texture_dimension_2d,
+        )?;
         let (nw, nh) = night.dimensions();
         ensure!(
             nw >= 2 && nh >= 2,
@@ -564,7 +598,12 @@ impl GlobePass {
             orbit_segments: 0,
             orbit_key: None,
             draw_marker: false,
+            texture_plan,
         })
+    }
+
+    pub fn texture_summary(&self) -> String {
+        self.texture_plan.summary()
     }
 
     pub fn set_style(&mut self, style: GlobeStyle) {
@@ -688,6 +727,18 @@ mod tests {
             gmst_rad: 0.0,
             ecef_from_gcrf: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
+    }
+
+    #[test]
+    fn texture_fit_preserves_global_aspect_and_never_upscales_or_exceeds_gpu_limits() {
+        let image = image::RgbaImage::new(8, 4);
+        assert_eq!(
+            fit_texture(image.clone(), 4, 8).unwrap().dimensions(),
+            (4, 2)
+        );
+        assert!(fit_texture(image.clone(), 16, 16).is_err());
+        assert!(fit_texture(image, 8, 4).is_err());
+        assert!(fit_texture(image::RgbaImage::new(8, 8), 4, 8).is_err());
     }
 
     #[test]
