@@ -2,10 +2,12 @@
 //! field. The picture is a DSS2 sky-survey image around the target, never an image taken by Hubble or
 //! JWST, and the display says so.
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use retroradar_core::config::SkySources;
 use retroradar_core::schedule::{FieldRequest, FieldState};
@@ -14,6 +16,9 @@ use crate::tasks::Event;
 
 /// Largest response read for a picture or a program file, bytes.
 const MAX_BODY: u64 = 8 * 1024 * 1024;
+const ENDPOINT_PAUSE: Duration = Duration::from_secs(60);
+const CDS_PRIMARY: &str = "https://alasky.cds.unistra.fr/hips-image-services/hips2fits";
+const CDS_MIRROR: &str = "https://alaskybis.cds.unistra.fr/hips-image-services/hips2fits";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Position {
@@ -147,6 +152,34 @@ pub fn cutout_url(cfg: &SkySources, ra_deg: f64, dec_deg: f64) -> String {
     )
 }
 
+/// Use the other documented CDS endpoint when a built-in endpoint fails.
+/// Custom servers remain exclusive and never send their positions to a public mirror.
+fn cutout_urls(cfg: &SkySources, ra_deg: f64, dec_deg: f64) -> Vec<String> {
+    let primary = cutout_url(cfg, ra_deg, dec_deg);
+    let mirror = match cfg.hips2fits_url.as_str() {
+        CDS_PRIMARY => Some(CDS_MIRROR),
+        CDS_MIRROR => Some(CDS_PRIMARY),
+        _ => None,
+    };
+    let mut urls = vec![primary.clone()];
+    if let Some(mirror) = mirror {
+        urls.push(format!("{}{}", mirror, &primary[cfg.hips2fits_url.len()..]));
+    }
+    urls
+}
+
+fn endpoint(url: &str) -> &str {
+    let authority_start = url.find("://").map_or(0, |i| i + 3);
+    let end = url[authority_start..]
+        .find('/')
+        .map_or(url.len(), |i| authority_start + i);
+    &url[..end]
+}
+
+fn jpeg_signature(body: &[u8]) -> bool {
+    body.len() >= 4 && body[..2] == [0xFF, 0xD8]
+}
+
 /// Names a visit list uses for things that are not sky positions.
 fn is_internal_name(name: &str) -> bool {
     let n = name.trim();
@@ -162,6 +195,8 @@ struct Http {
     user_agent: String,
     cache: PathBuf,
     max_age_s: f64,
+    offline: bool,
+    paused: RefCell<BTreeMap<String, Instant>>,
 }
 
 impl Http {
@@ -179,32 +214,75 @@ impl Http {
     }
 
     fn get(&self, key: &str, url: &str) -> Result<Vec<u8>, String> {
-        if let Some(b) = self.cached(key) {
-            return Ok(b);
+        self.get_many(key, &[url.to_owned()], false)
+    }
+
+    fn get_many(&self, key: &str, urls: &[String], jpeg: bool) -> Result<Vec<u8>, String> {
+        if let Some(body) = self.cached(key).filter(|b| !jpeg || jpeg_signature(b)) {
+            return Ok(body);
         }
-        let mut resp = self
-            .agent
-            .get(url)
-            .header("User-Agent", &self.user_agent)
-            .call()
-            .map_err(|e| format!("{url}: {e}"))?;
-        if resp.status().as_u16() != 200 {
-            return Err(format!("{url}: HTTP {}", resp.status().as_u16()));
+        if self.offline {
+            return Err("offline and not cached".into());
         }
-        let body = resp
-            .body_mut()
-            .with_config()
-            .limit(MAX_BODY)
-            .read_to_vec()
-            .map_err(|e| format!("{url}: {e}"))?;
-        if body.is_empty() {
-            return Err(format!("{url}: empty reply"));
+        let mut errors = Vec::new();
+        for url in urls {
+            let host = endpoint(url);
+            if self
+                .paused
+                .borrow()
+                .get(host)
+                .is_some_and(|until| *until > Instant::now())
+            {
+                errors.push(format!("{host}: retries paused after an endpoint failure"));
+                continue;
+            }
+            let mut resp = match self
+                .agent
+                .get(url)
+                .header("User-Agent", &self.user_agent)
+                .call()
+            {
+                Ok(resp) => resp,
+                Err(e) => {
+                    self.pause(host);
+                    errors.push(format!("{url}: {e}"));
+                    continue;
+                }
+            };
+            let status = resp.status().as_u16();
+            if status != 200 {
+                if status == 429 || status >= 500 {
+                    self.pause(host);
+                }
+                errors.push(format!("{url}: HTTP {status}"));
+                continue;
+            }
+            let body = match resp.body_mut().with_config().limit(MAX_BODY).read_to_vec() {
+                Ok(body) => body,
+                Err(e) => {
+                    self.pause(host);
+                    errors.push(format!("{url}: {e}"));
+                    continue;
+                }
+            };
+            if body.is_empty() || (jpeg && !jpeg_signature(&body)) {
+                errors.push(format!("{url}: empty reply or invalid JPEG signature"));
+                continue;
+            }
+            self.paused.borrow_mut().remove(host);
+            std::fs::create_dir_all(&self.cache)
+                .map_err(|e| format!("{}: {e}", self.cache.display()))?;
+            std::fs::write(self.cache.join(key), &body)
+                .map_err(|e| format!("{}: {e}", self.cache.display()))?;
+            return Ok(body);
         }
-        std::fs::create_dir_all(&self.cache)
-            .map_err(|e| format!("{}: {e}", self.cache.display()))?;
-        std::fs::write(self.cache.join(key), &body)
-            .map_err(|e| format!("{}: {e}", self.cache.display()))?;
-        Ok(body)
+        Err(errors.join("; "))
+    }
+
+    fn pause(&self, host: &str) {
+        self.paused
+            .borrow_mut()
+            .insert(host.to_owned(), Instant::now() + ENDPOINT_PAUSE);
     }
 
     fn text(&self, key: &str, url: &str) -> Result<String, String> {
@@ -260,18 +338,14 @@ fn resolve(
             })?
         }
     };
-    let url = cutout_url(cfg, pos.ra_deg, pos.dec_deg);
+    let urls = cutout_urls(cfg, pos.ra_deg, pos.dec_deg);
     let key = format!(
         "cutout-{:.4}-{:+.4}-{}.jpg",
         pos.ra_deg,
         pos.dec_deg,
         safe_key(&cfg.survey)
     );
-    let jpeg = http.get(&key, &url)?;
-    // A reply that is not a JPEG is an error page, not a picture.
-    if jpeg.len() < 4 || jpeg[..2] != [0xFF, 0xD8] {
-        return Err(format!("{url}: the reply is not a JPEG"));
-    }
+    let jpeg = http.get_many(&key, &urls, true)?;
     Ok((pos, jpeg))
 }
 
@@ -295,6 +369,8 @@ pub fn run(
         user_agent,
         cache: cache_dir.join("sky"),
         max_age_s: cfg.cache_s,
+        offline,
+        paused: RefCell::new(BTreeMap::new()),
     };
     while let Ok((vehicle, req)) = requests.recv() {
         let state = if offline {
@@ -340,6 +416,181 @@ fn ready(cfg: &SkySources, (pos, jpeg): (Position, Vec<u8>)) -> FieldState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct TestHttp(Http);
+
+    impl Drop for TestHttp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0.cache);
+        }
+    }
+
+    fn test_http(offline: bool) -> TestHttp {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        TestHttp(Http {
+            agent: ureq::Agent::config_builder()
+                .timeout_global(Some(Duration::from_secs(2)))
+                .http_status_as_error(false)
+                .build()
+                .into(),
+            user_agent: "retroradar-test".into(),
+            cache: std::env::temp_dir().join(format!(
+                "retroradar-sky-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            )),
+            max_age_s: 3600.0,
+            offline,
+            paused: RefCell::new(BTreeMap::new()),
+        })
+    }
+
+    fn serve(replies: Vec<(u16, Vec<u8>)>) -> (String, std::thread::JoinHandle<()>) {
+        use std::io::{BufRead, BufReader, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}/image", listener.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            for (status, body) in replies {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "mock HTTP request timed out");
+                            std::thread::sleep(Duration::from_millis(2));
+                        }
+                        Err(e) => panic!("mock HTTP accept: {e}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                loop {
+                    let mut line = String::new();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                }
+                write!(
+                    stream,
+                    "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .unwrap();
+                stream.write_all(&body).unwrap();
+            }
+        });
+        (url, worker)
+    }
+
+    #[test]
+    fn documented_cds_mirror_preserves_query_and_custom_servers_remain_exclusive() {
+        let mut cfg = cfg();
+        let urls = cutout_urls(&cfg, 12.0, -20.0);
+        assert_eq!(urls.len(), 2);
+        assert!(urls[1].starts_with(CDS_MIRROR));
+        assert_eq!(
+            urls[0].split_once('?').unwrap().1,
+            urls[1].split_once('?').unwrap().1
+        );
+        cfg.hips2fits_url = "https://private.example/cutout".into();
+        assert_eq!(cutout_urls(&cfg, 12.0, -20.0).len(), 1);
+    }
+
+    #[test]
+    fn sky_service_503_falls_back_and_reuses_the_successful_cache() {
+        let fixture = test_http(false);
+        let jpeg = vec![0xff, 0xd8, 0xff, 0xd9];
+        let (primary, a) = serve(vec![(503, b"temporarily unavailable".to_vec())]);
+        let (mirror, b) = serve(vec![(200, jpeg.clone())]);
+        let urls = vec![primary, mirror];
+        assert_eq!(
+            fixture.0.get_many("picture.jpg", &urls, true).unwrap(),
+            jpeg
+        );
+        a.join().unwrap();
+        b.join().unwrap();
+        // Both servers are gone: this succeeds only from the validated cache.
+        assert_eq!(
+            fixture.0.get_many("picture.jpg", &urls, true).unwrap(),
+            jpeg
+        );
+    }
+
+    #[test]
+    fn error_pages_are_not_cached_as_pictures_and_the_mirror_is_tried() {
+        let fixture = test_http(false);
+        let (primary, a) = serve(vec![(200, b"<html>error</html>".to_vec())]);
+        let (mirror, b) = serve(vec![(200, vec![0xff, 0xd8, 0xff, 0xd9])]);
+        let body = fixture
+            .0
+            .get_many("picture.jpg", &[primary, mirror], true)
+            .unwrap();
+        assert!(jpeg_signature(&body));
+        assert_eq!(
+            std::fs::read(fixture.0.cache.join("picture.jpg")).unwrap(),
+            body
+        );
+        a.join().unwrap();
+        b.join().unwrap();
+    }
+
+    #[test]
+    fn endpoint_failures_pause_other_targets_and_can_retry_after_the_pause() {
+        let fixture = test_http(false);
+        let (url, server) = serve(vec![(503, vec![]), (200, b"ready".to_vec())]);
+        assert!(fixture.0.get("first", &url).unwrap_err().contains("503"));
+        assert!(
+            fixture
+                .0
+                .get("second", &url)
+                .unwrap_err()
+                .contains("retries paused")
+        );
+        fixture
+            .0
+            .paused
+            .borrow_mut()
+            .insert(endpoint(&url).to_owned(), Instant::now());
+        assert_eq!(fixture.0.get("third", &url).unwrap(), b"ready");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn offline_sky_cache_misses_never_connect_and_cache_hits_still_work() {
+        let fixture = test_http(true);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}/image", listener.local_addr().unwrap());
+        assert_eq!(
+            fixture.0.get("missing", &url).unwrap_err(),
+            "offline and not cached"
+        );
+        std::fs::create_dir_all(&fixture.0.cache).unwrap();
+        std::fs::write(fixture.0.cache.join("cached"), b"cached text").unwrap();
+        assert_eq!(fixture.0.get("cached", &url).unwrap(), b"cached text");
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn invalid_cached_images_are_rejected_without_network_in_offline_mode() {
+        let fixture = test_http(true);
+        std::fs::create_dir_all(&fixture.0.cache).unwrap();
+        std::fs::write(fixture.0.cache.join("bad.jpg"), b"<html>error</html>").unwrap();
+        assert_eq!(
+            fixture
+                .0
+                .get_many("bad.jpg", &["http://127.0.0.1:1/image".into()], true)
+                .unwrap_err(),
+            "offline and not cached"
+        );
+    }
 
     const PRO: &str = "\
 1   HD-35165     STAR, B3-B5 V-IV, BE    RA=05H21M16.8603S,               J2000             V = 6.09

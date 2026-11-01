@@ -2,8 +2,8 @@
 //! block the UI or another source. On start each task publishes its cached copy immediately, then
 //! refreshes in the background with exponential backoff and jitter after failures.
 
-use std::sync::Arc;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, sync_channel};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -15,6 +15,15 @@ use retroradar_core::time::{EopTable, Utc};
 use retroradar_core::world::Health;
 
 use crate::cache::{CacheError, HttpCache, Refresh};
+
+// Shared across source threads and SourceSet instances; never hold during backoff.
+static HORIZONS_REQUEST: Mutex<()> = Mutex::new(());
+
+fn with_request_slot<T>(key: &SourceKey, fetch: impl FnOnce() -> T) -> T {
+    let _slot = matches!(key, SourceKey::Horizons(_))
+        .then(|| HORIZONS_REQUEST.lock().unwrap_or_else(|e| e.into_inner()));
+    fetch()
+}
 
 /// Events queued between sources and the engine before senders block.
 const EVENT_QUEUE: usize = 64;
@@ -536,7 +545,7 @@ fn supervise(
         };
         let (mut done, mut errors) = (false, Vec::new());
         for url in &spec.urls_at(Utc(now)) {
-            match cache.refresh(&spec.cache_key, url, interval, now) {
+            match with_request_slot(&key, || cache.refresh(&spec.cache_key, url, interval, now)) {
                 Ok(Refresh::NotDue | Refresh::NotModified) => {
                     done = true;
                     break;
@@ -676,6 +685,57 @@ fn summarise(p: &Payload) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn horizons_requests_are_serialized_across_vehicles() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let active = Arc::new(AtomicUsize::new(0));
+        let maximum = Arc::new(AtomicUsize::new(0));
+        let start = Arc::new(std::sync::Barrier::new(3));
+        let threads: Vec<_> = (0..3)
+            .map(|i| {
+                let (active, maximum, start) = (active.clone(), maximum.clone(), start.clone());
+                std::thread::spawn(move || {
+                    start.wait();
+                    with_request_slot(&SourceKey::Horizons(format!("vehicle-{i}")), || {
+                        let n = active.fetch_add(1, Ordering::SeqCst) + 1;
+                        maximum.fetch_max(n, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(5));
+                        active.fetch_sub(1, Ordering::SeqCst);
+                    });
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().unwrap();
+        }
+        assert_eq!(maximum.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_horizons_request_does_not_block_other_providers() {
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let busy = std::thread::spawn(move || {
+            with_request_slot(&SourceKey::Horizons("jwst".into()), || {
+                entered_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+            });
+        });
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let other = std::thread::spawn(move || {
+            with_request_slot(&SourceKey::Gp("iss".into()), || done_tx.send(()).unwrap());
+        });
+        let result = done_rx.recv_timeout(Duration::from_secs(2));
+        release_tx.send(()).unwrap();
+        busy.join().unwrap();
+        other.join().unwrap();
+        assert!(
+            result.is_ok(),
+            "a non-JPL provider waited for the Horizons slot"
+        );
+    }
 
     #[test]
     fn default_config_yields_gp_for_each_vehicle_plus_one_oem_and_eop() {

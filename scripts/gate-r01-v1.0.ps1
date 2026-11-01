@@ -29,6 +29,8 @@ try {
     $env:RUSTFLAGS = '-Dwarnings'
     Step 'Portable Windows paths' { cargo test --locked -p retroradar --test portable }
     Step 'Globe overlay clipping' { cargo test --locked -p retroradar-gui sun_at_the_globe_edge }
+    Step 'Sky service recovery' { cargo test --locked -p retroradar-sources sky::tests }
+    Step 'Horizons request scheduling' { cargo test --locked -p retroradar-sources tasks::tests }
     Step 'Workspace regressions' { cargo test --locked --workspace --all-targets }
     Step 'Lockfile unchanged after Cargo' { git diff --exit-code -- Cargo.lock }
     Step 'Release binary' { cargo build --locked --release --bin retroradar }

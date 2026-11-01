@@ -3,7 +3,7 @@
 # Invalid values fail loudly with the file and reason; there are no silent defaults.
 
 [fetch]
-user_agent = "retroradar/0.0 (mission control display; github.com/TheWinterLynx/retroradar)"
+user_agent = "retroradar/0.1.1 (mission control display; https://github.com/TheWinterLynx/retroradar)"
 timeout_s = 30
 # Exponential backoff after a failed fetch, with jitter, capped.
 backoff_initial_s = 30
