@@ -1,0 +1,2 @@
+# Keep the Cargo lockfile canonical on Windows and Unix.
+/Cargo.lock text eol=lf

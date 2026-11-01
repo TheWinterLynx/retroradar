@@ -1960,116 +1960,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "retroradar-astro"
-version = "0.1.1"
-dependencies = [
- "retroradar-core",
- "nalgebra 0.35.0",
- "ode_solvers",
- "proptest",
- "serde",
- "serde_json",
- "sgp4",
- "thiserror 2.0.21",
- "tracing",
-]
-
-[[package]]
-name = "retroradar-core"
-version = "0.1.1"
-dependencies = [
- "arc-swap",
- "directories",
- "nalgebra 0.35.0",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "retroradar-gui"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "bytemuck",
- "egui",
- "egui-wgpu",
- "egui-winit",
- "glam 0.34.1",
- "image",
- "retroradar-astro",
- "retroradar-core",
- "retroradar-sim",
- "retroradar-sources",
- "pollster",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "toml",
- "tracing",
- "wgpu",
- "winit",
-]
-
-[[package]]
-name = "retroradar-sim"
-version = "0.1.1"
-dependencies = [
- "retroradar-astro",
- "retroradar-core",
- "retroradar-sources",
- "retroradar-store",
- "nalgebra 0.35.0",
- "serde_json",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "retroradar-sources"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "chrono",
- "futures-util",
- "retroradar-astro",
- "retroradar-core",
- "proptest",
- "rustls",
- "rustls-rustcrypto",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "toml",
- "tracing",
- "ureq",
- "webpki-roots 0.26.11",
- "zbus",
-]
-
-[[package]]
-name = "retroradar-store"
-version = "0.1.1"
-dependencies = [
- "retroradar-core",
- "rusqlite",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
-]
-
-[[package]]
-name = "retroradar-tui"
-version = "0.1.1"
-
-[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3304,6 +3194,116 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "retroradar-astro"
+version = "0.1.1"
+dependencies = [
+ "nalgebra 0.35.0",
+ "ode_solvers",
+ "proptest",
+ "retroradar-core",
+ "serde",
+ "serde_json",
+ "sgp4",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "retroradar-core"
+version = "0.1.1"
+dependencies = [
+ "arc-swap",
+ "directories",
+ "nalgebra 0.35.0",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "retroradar-gui"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "egui",
+ "egui-wgpu",
+ "egui-winit",
+ "glam 0.34.1",
+ "image",
+ "pollster",
+ "proptest",
+ "retroradar-astro",
+ "retroradar-core",
+ "retroradar-sim",
+ "retroradar-sources",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
+name = "retroradar-sim"
+version = "0.1.1"
+dependencies = [
+ "nalgebra 0.35.0",
+ "retroradar-astro",
+ "retroradar-core",
+ "retroradar-sources",
+ "retroradar-store",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "retroradar-sources"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures-util",
+ "proptest",
+ "retroradar-astro",
+ "retroradar-core",
+ "rustls",
+ "rustls-rustcrypto",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "toml",
+ "tracing",
+ "ureq",
+ "webpki-roots 0.26.11",
+ "zbus",
+]
+
+[[package]]
+name = "retroradar-store"
+version = "0.1.1"
+dependencies = [
+ "retroradar-core",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "retroradar-tui"
+version = "0.1.1"
 
 [[package]]
 name = "rfc6979"
