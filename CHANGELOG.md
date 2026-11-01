@@ -8,6 +8,9 @@ change behaviour.
 
 ### Fixed
 
+- Artificial night lights fade with their screen magnification, preventing
+  saturation and excessive bloom from obscuring regional terrain at close zoom.
+
 - The sky-service loopback server explicitly restores blocking mode on accepted
   sockets before timed reads/writes, covering Winsock listener-mode inheritance.
   Replies are sent in full and connections use a bounded graceful TCP close.

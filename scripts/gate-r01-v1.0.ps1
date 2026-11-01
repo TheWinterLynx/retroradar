@@ -46,6 +46,7 @@ try {
         try {
             Step 'Close-view coastline GPU regression' { cargo test --locked -p retroradar-gui coast_overlay_fades_in_close_view_but_remains_in_overview -- --ignored --nocapture }
             Step 'Regional imagery GPU alignment and no-data fallback' { cargo test --locked -p retroradar-gui regional_imagery_aligns_with_ground_and_preserves_missing_tile_fallback -- --ignored --nocapture }
+            Step 'Maximum night zoom exposure and terrain contrast' { cargo test --locked -p retroradar-gui maximum_night_zoom_keeps_city_lights_below_glare_and_terrain_visible -- --ignored --nocapture }
             Step 'Windows HD GPU/window smoke (120 frames)' { & .\target\release\retroradar.exe --data-dir $portable --offline --no-record --earth-quality high --size 1280x720 --exit-after-frames 120 }
         } finally {
             if (Test-Path $portable) { Remove-Item -Recurse -Force $portable }

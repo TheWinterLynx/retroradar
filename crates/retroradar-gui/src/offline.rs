@@ -951,9 +951,7 @@ mod tests {
             println!("Coast-affected pixels overview / nadir: {counts:?}");
         }
 
-        #[test]
-        #[ignore = "needs a GPU; uses only bundled CC BY 4.0 imagery, no network"]
-        fn regional_imagery_aligns_with_ground_and_preserves_missing_tile_fallback() {
+        fn madrid_live() -> Live {
             use retroradar_core::state::{Quality, SourceKind, State};
             use retroradar_core::world::Solution;
             let live = live();
@@ -985,6 +983,13 @@ mod tests {
                 ecef_from_gcrf: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             });
             live.bus.publish(world);
+            live
+        }
+
+        #[test]
+        #[ignore = "needs a GPU; uses only bundled CC BY 4.0 imagery, no network"]
+        fn regional_imagery_aligns_with_ground_and_preserves_missing_tile_fallback() {
+            let live = madrid_live();
             let mut off = Offline::new(
                 &live,
                 crate::theme::embedded().unwrap(),
@@ -1069,6 +1074,91 @@ mod tests {
             println!(
                 "Native regional tile changed {changed} pixels in its geographic bounds; no-data fallback matched the base."
             );
+        }
+
+        #[test]
+        #[ignore = "needs a GPU; deterministic night exposure test, no network"]
+        fn maximum_night_zoom_keeps_city_lights_below_glare_and_terrain_visible() {
+            let live = madrid_live();
+            let mut world = (*live.bus.latest()).clone();
+            let sol = world.vehicles[0].solution.as_mut().unwrap();
+            sol.sun_gcrf_km = [-1.5e8, 0.0, 0.0];
+            sol.illumination = 0.0;
+            live.bus.publish(world);
+            let themes = crate::theme::embedded().unwrap();
+            let names: Vec<_> = themes.iter().map(|t| t.name.clone()).collect();
+            let mut off = Offline::new(
+                &live,
+                themes,
+                Some("modern"),
+                [1920, 1080],
+                false,
+                true,
+                crate::EarthQuality::Low,
+            )
+            .unwrap();
+            off.console.page = crate::pages::Page::View;
+            off.console.sub = 0;
+            off.console.camera.window_fov_deg = crate::window::MIN_FOV_DEG;
+            let tile = image::load_from_memory(include_bytes!(
+                "../fixtures/earth/s2-2016-z13-y2257-x8023.jpg"
+            ))
+            .unwrap()
+            .to_rgba8();
+            let mut patch =
+                image::RgbaImage::new(crate::terrain::PATCH_SIZE, crate::terrain::PATCH_SIZE);
+            image::imageops::replace(&mut patch, &tile, 3 * 256, 3 * 256);
+            let bounds = crate::terrain::Key {
+                level: 13,
+                x: 8020,
+                y: 2254,
+            }
+            .bounds();
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/night-zoom-v1.0");
+            std::fs::create_dir_all(&dir).unwrap();
+            for (index, name) in names.iter().enumerate() {
+                off.select_theme(index);
+                // Include the themes' bloom; isolate it from persistence and scanlines.
+                off.console.toggles = EffectToggles::all(false);
+                off.console.toggles.bloom = true;
+                off.renderer.globe_mut().clear_detail();
+                off.frame(4, 16.7).unwrap();
+                off.frame(4, 16.7).unwrap();
+                let base = off.capture().unwrap();
+                off.renderer
+                    .globe_mut()
+                    .upload_detail(&off.gpu.queue, &patch, bounds);
+                off.frame(4, 16.7).unwrap();
+                let detail = off.capture().unwrap();
+                let mut peak = 0u8;
+                let mut changed = 0;
+                // An urban area inside the native tile, away from reticle/text.
+                for y in 440..600 {
+                    for x in 680..900 {
+                        let a = detail.get_pixel(x, y).0;
+                        peak = peak.max(*a[..3].iter().max().unwrap());
+                        if a[..3]
+                            .iter()
+                            .zip(base.get_pixel(x, y).0)
+                            .any(|(a, b)| a.abs_diff(b) > 2)
+                        {
+                            changed += 1;
+                        }
+                    }
+                }
+                detail.save(dir.join(format!("{name}.png"))).unwrap();
+                assert!(
+                    peak < 120,
+                    "night lights mask the terrain in {name}: peak={peak}"
+                );
+                assert!(
+                    changed > 1000,
+                    "regional terrain is lost in {name}: changed={changed}"
+                );
+                println!(
+                    "{name}: night peak {peak}/255, {changed} urban pixels retain regional contrast"
+                );
+            }
         }
 
         /// Renders fixed pages from a fixed world and compares them with `tests/golden`. Needs a GPU adapter,

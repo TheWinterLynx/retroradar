@@ -127,7 +127,13 @@ fn fs_sphere(in: FullOut) -> FsOut {
     // City lights: the bright part of the night-side picture, on the dark side only.
     let city_luma = dot(lights, vec3<f32>(0.299, 0.587, 0.114));
     let city = smoothstep(0.16, 0.7, city_luma);
-    let city_col = select(CITY_LIGHT, u.day_tint.rgb, u.viewport.w > 0.5) * city * 1.3;
+    // Black Marble is a global composite: at close zoom one light-map texel
+    // covers many screen pixels. Reduce its display gain before the additive
+    // light washes out regional terrain or feeds bloom. Keep overview gain.
+    let night_size = vec2<f32>(textureDimensions(night_tex));
+    let night_footprint = max(length(dx * night_size), length(dy * night_size));
+    let city_gain = mix(0.025, 1.0, smoothstep(0.125, 1.0, night_footprint));
+    let city_col = select(CITY_LIGHT, u.day_tint.rgb, u.viewport.w > 0.5) * city * 1.3 * city_gain;
     var col = mix(night_col, day_col, day) + city_col * (1.0 - day);
     col = max(col, u.night_tint.rgb * u.shade.x);
     // A cartographic raster line becomes a wide staircase when viewed from low

@@ -107,3 +107,24 @@ probe passed through the runner's HTTP proxy with its explicitly trusted test CA
 the runner's default proxy/trust setup could not complete that probe. Production
 TLS trust was not relaxed. Formatting passed; Cargo.lock is unchanged. Windows
 GPU and online-source acceptance remain owner checks.
+
+## Night-light exposure at close zoom
+
+Artificial-light gain now follows the night texture's screen footprint, in every
+Earth view and theme. Overview gain is unchanged when a night-map texel is at
+most one screen pixel wide. As the texel expands from one to eight screen pixels,
+gain smoothly falls to 2.5% of the overview value. This is display exposure, not
+a change to the historical light data, physical Sun illumination or the terrain.
+It acts before bloom, so magnified lights cannot flood the regional image.
+
+A deterministic GPU regression renders the Madrid fixture at maximum night zoom
+with each built-in theme's bloom. It checks the urban area's peak brightness and
+that regional texture contrast remains visible. Before the fix it fails with
+255/255 saturation. The graphical gate runs it; screenshots are written under
+`target/night-zoom-v1.0`. Windows visual acceptance remains an owner check.
+
+Night-exposure validation (Linux / Rust 1.95.0): 364 normal tests passed, 11
+ignored; all four explicit GPU regressions passed. The original shader failed
+the new night test at 255/255. After the fix, measured urban-area peaks with bloom
+were 82/255 (Phosphor, Retro), 55/255 (Modern), 68/255 (Retrowave), with regional
+contrast retained in every theme. Formatting/release passed; Cargo.lock unchanged.
