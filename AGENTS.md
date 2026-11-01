@@ -1,11 +1,23 @@
 # RetroRadar engineering contract
 
 ## Product
-Windows-native Rust mission-control display, preserving mctl's pages, themes,
+Windows-native Rust mission-control display, with orbital pages, themes,
 orbital engine, sources and recording. Retain GPL-3.0-or-later, upstream credits,
 asset licences and provenance. This is an independent repository, never a GitHub fork.
 Missing values remain NO DATA; preserve LIVE/SIM/REPLAY and source-quality labels.
 No network or propagation work on the rendering thread. No invented telemetry.
+
+## Language and dependencies
+Owner requirement: application code and third-party implementations must be Rust.
+SQLite (libsqlite3-sys through rusqlite) is the explicitly approved native-code
+exception. Do not introduce ring, aws-lc, OpenSSL or another C/C++ implementation.
+Windows OS APIs, drivers and the platform linker are host services, not application
+implementations. SQLite still needs a C compiler at build time.
+Use the explicit RustCrypto TLS provider for HTTP and WebSocket connections;
+never disable certificate/hostname checks. The provider is upstream experimental,
+not production-ready: preserve this documented limitation. Run the Windows
+dependency-policy gate after manifest/lock changes. Its compiler-consumer and
+package checks are regression guards, not a universal source-language proof.
 
 ## Workflow
 - main is stable. Work on one focused `agent/<milestone>` branch from current main.
@@ -30,6 +42,6 @@ Network source checks are separate: an external outage is not a compiler regress
 Do not reset, stash or discard owner edits automatically.
 
 ## Architecture
-Keep reusable mctl-* crate names for now to reduce import churn. Public executable
-and application directories are retroradar. Refer to docs/UPSTREAM.md and
+Crate names, executable and application directories use retroradar.
+Refer to NOTICE.md and
  docs/ROADMAP.md before adding functionality. Update changed-file documentation.
