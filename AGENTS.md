@@ -2,8 +2,8 @@
 
 ## Product
 Windows-native Rust mission-control display, with orbital pages, themes,
-orbital engine, sources and recording. Retain GPL-3.0-or-later, upstream credits,
-asset licences and provenance. This is an independent repository, never a GitHub fork.
+orbital engine, sources and recording. Retain GPL-3.0-or-later and dependency/asset licence texts.
+Keep the product and repository identity exclusively RetroRadar. This is an independent repository, never a GitHub fork.
 Missing values remain NO DATA; preserve LIVE/SIM/REPLAY and source-quality labels.
 No network or propagation work on the rendering thread. No invented telemetry.
 
