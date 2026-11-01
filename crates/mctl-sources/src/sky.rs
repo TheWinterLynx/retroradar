@@ -287,6 +287,7 @@ pub fn run(
 ) {
     let http = Http {
         agent: ureq::Agent::config_builder()
+            .tls_config(crate::tls::http_config())
             .timeout_global(Some(Duration::from_secs_f64(timeout_s)))
             .http_status_as_error(false)
             .build()

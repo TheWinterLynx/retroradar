@@ -75,6 +75,7 @@ impl HttpCache {
     pub fn new(dir: PathBuf, user_agent: &str, timeout_s: f64) -> Result<Self, CacheError> {
         std::fs::create_dir_all(&dir).map_err(io(&dir))?;
         let agent: ureq::Agent = ureq::Agent::config_builder()
+            .tls_config(crate::tls::http_config())
             .timeout_global(Some(Duration::from_secs_f64(timeout_s)))
             .http_status_as_error(false)
             .build()

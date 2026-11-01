@@ -23,6 +23,7 @@ if ($LASTEXITCODE -ne 0 -or -not $vsInstall) { throw 'MSVC C++ build tools are m
 $sdkLib = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib\*\um\x64\kernel32.lib'
 if (-not (Test-Path $sdkLib)) { throw 'Install a Windows SDK with x64 libraries using Visual Studio Installer.' }
 Step 'Formatting' { cargo fmt --all -- --check }
+Step 'Rust dependency policy (SQLite exception)' { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-rust-deps-v1.0.ps1') }
 $previousFlags = $env:RUSTFLAGS
 try {
     $env:RUSTFLAGS = '-Dwarnings'

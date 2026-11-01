@@ -39,3 +39,14 @@ Windows MSVC build, PowerShell gate execution, Windows GPU smoke, all-page visua
 acceptance and real-source connectivity have not been run here. They remain owner
 gates; Linux success is not Windows acceptance. Inherited ignored tests remain
 ignored because they require external fixtures, GeoClue or rendering acceptance.
+
+## R01 Rust-only policy revision (2026-11-01)
+
+Owner permits SQLite as the native-code exception. Replaced ring with explicit
+RustCrypto providers for every HTTP agent and the WebSocket client. Added TLS
+handshake/certificate regressions and the active Windows dependency-policy gate.
+336 tests passed with warnings denied; the Windows dependency tree has no active
+ring/aws-lc/OpenSSL and libsqlite3-sys is the only cc consumer.
+See RUST-DEPENDENCIES-v1.0.md for the alpha provider's production limitation.
+The previous 332-test/dependency-equality result above describes the original R01
+head, not this dependency revision. Windows owner acceptance remains pending.

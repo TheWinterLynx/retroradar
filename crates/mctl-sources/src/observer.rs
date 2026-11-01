@@ -40,6 +40,7 @@ pub fn parse_ip_json(body: &str, ip: &IpLookup) -> Result<(f64, f64), String> {
 fn ip_lookup(cfg: &Config) -> Result<Resolved, String> {
     let ip = &cfg.observer.ip;
     let agent: ureq::Agent = ureq::Agent::config_builder()
+        .tls_config(crate::tls::http_config())
         .timeout_global(Some(Duration::from_secs_f64(cfg.fetch.timeout_s)))
         .user_agent(cfg.fetch.user_agent.clone())
         .build()

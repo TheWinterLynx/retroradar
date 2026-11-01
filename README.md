@@ -11,6 +11,13 @@ VIEW, SYS y OPS; globo orbital 3D, trazas, predicción de pases, ISS/Dragon/Hubb
 JWST/Roman, telemetría ISS, maniobras, grabación SQLite, replay y exportación CSV.
 También conserva los cuatro temas y efectos CRT originales.
 
+El código de la aplicación es Rust. **SQLite es la excepción nativa autorizada**.
+La criptografía HTTPS/WSS usa RustCrypto en lugar de ring. El proveedor publicado
+`rustls-rustcrypto 0.0.2-alpha` es experimental y su autor desaconseja producción;
+esta limitación sigue abierta aunque las pruebas TLS pasen. No se desactivan las
+validaciones de certificados ni nombres de servidor. Véase la
+[política de dependencias](docs/RUST-DEPENDENCIES-v1.0.md).
+
 Añadido en R01:
 
 - Ejecutable `retroradar.exe`, ventana RetroRadar y directorios propios.
@@ -31,7 +38,8 @@ revalidados por el mero hecho de importarlos.
 
 Instalar **Git for Windows**, **Rust mediante rustup** y **Visual Studio 2022 Build
 Tools**, con la carga **Desktop development with C++**, herramientas MSVC y Windows
-SDK. Reiniciar la terminal después de instalar. Se fija Rust 1.95.0 en
+SDK. Se necesitan para enlazar el ejecutable Rust y compilar SQLite; no hay
+código de aplicación C/C++. Reiniciar la terminal después de instalar. Se fija Rust 1.95.0 en
 `rust-toolchain.toml`; rustup lo descarga al ejecutar Cargo. Usar toolchain MSVC,
 no WSL. La primera compilación requiere Internet para descargar dependencias.
 
@@ -42,7 +50,7 @@ git clone --branch agent/r01-windows-foundation https://github.com/TheWinterLynx
 ```
 
 El script muestra el commit probado y para al primer fallo: limpieza del checkout,
-prerrequisitos, formato, tests del workspace con `-Dwarnings`, compilación release,
+prerrequisitos, formato, política de dependencias Windows, tests del workspace con `-Dwarnings`, compilación release,
 doctor aislado y ventana offline durante 120 frames. Sin datos en caché esa ventana
 puede indicar NO DATA: es correcto. `-SkipGpu` solo permite validar código y no
 constituye aceptación gráfica. No guarda informes ni logs.

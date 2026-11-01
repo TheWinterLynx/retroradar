@@ -9,3 +9,5 @@ pub mod observer;
 pub mod schedules;
 pub mod sky;
 pub mod tasks;
+
+pub(crate) mod tls;

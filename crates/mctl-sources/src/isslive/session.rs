@@ -57,18 +57,7 @@ pub struct SessionSummary {
 }
 
 fn tls_connector() -> Result<Connector> {
-    // The ring provider and bundled web PKI roots keep the build free of OpenSSL and of any
-    // system certificate store, per NFR-1.
-    let roots = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-    };
-    let cfg = rustls::ClientConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .context("selecting TLS protocol versions")?
-    .with_root_certificates(roots)
-    .with_no_client_auth();
+    let cfg = crate::tls::client_config().context("building WebSocket TLS configuration")?;
     Ok(Connector::Rustls(Arc::new(cfg)))
 }
 
