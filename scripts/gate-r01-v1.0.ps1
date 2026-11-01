@@ -28,6 +28,7 @@ $previousFlags = $env:RUSTFLAGS
 try {
     $env:RUSTFLAGS = '-Dwarnings'
     Step 'Portable Windows paths' { cargo test --locked -p retroradar --test portable }
+    Step 'Zoom-sensitive globe navigation' { cargo test --locked -p retroradar-gui manual_rotation_slows; if ($LASTEXITCODE -ne 0) { throw 'Camera sensitivity failed.' }; cargo test --locked -p retroradar-gui arrows_and_drag_share_zoom_sensitivity }
     Step 'Globe overlay clipping' { cargo test --locked -p retroradar-gui sun_at_the_globe_edge }
     Step 'Sky service recovery' { cargo test --locked -p retroradar-sources sky::tests }
     Step 'Horizons request scheduling' { cargo test --locked -p retroradar-sources tasks::tests }
@@ -41,6 +42,7 @@ try {
     if (Test-Path $portable) { throw 'Doctor unexpectedly created files.' }
     if (-not $SkipGpu) {
         try {
+            Step 'Close-view coastline GPU regression' { cargo test --locked -p retroradar-gui coast_overlay_fades_in_close_view_but_remains_in_overview -- --ignored --nocapture }
             Step 'Windows HD GPU/window smoke (120 frames)' { & .\target\release\retroradar.exe --data-dir $portable --offline --no-record --earth-quality high --size 1280x720 --exit-after-frames 120 }
         } finally {
             if (Test-Path $portable) { Remove-Item -Recurse -Force $portable }

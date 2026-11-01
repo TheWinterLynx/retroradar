@@ -84,6 +84,19 @@ impl Camera {
             (self.elevation_deg + d_el_deg).clamp(-ELEVATION_LIMIT_DEG, ELEVATION_LIMIT_DEG);
     }
 
+    /// Scale manual motion by clearance from the active focus. Near the Earth,
+    /// height above the surface matters, rather than distance from its centre.
+    /// Keep the familiar overview speed and leave physical/kiosk rotation alone.
+    pub fn orbit_input_by(&mut self, d_az_deg: f32, d_el_deg: f32) {
+        let scale = if self.focus_vehicle {
+            self.dist_vehicle_re / DEFAULT_DISTANCE_VEHICLE_RE
+        } else {
+            (self.dist_earth_re - 1.0) / (DEFAULT_DISTANCE_EARTH_RE - 1.0)
+        }
+        .clamp(0.02, 1.0);
+        self.orbit_by(d_az_deg * scale, d_el_deg * scale);
+    }
+
     /// Multiply the distance of the active focus by `factor` (clamped).
     pub fn zoom_by(&mut self, factor: f32) {
         if self.focus_vehicle {
@@ -822,6 +835,36 @@ mod tests {
         assert!(v[..4].iter().all(|p| p[3] < 0.0));
         assert!(v[4][3] == 0.0 && v[9][3] > 0.8 && v[9][3] < 1.0);
         assert!(v.iter().skip(4).all(|p| p[3] >= 0.0));
+    }
+
+    #[test]
+    fn manual_rotation_slows_continuously_with_zoom_for_both_focuses() {
+        for focus_vehicle in [false, true] {
+            let mut camera = Camera {
+                focus_vehicle,
+                ..Camera::default()
+            };
+            let mut previous = f32::MAX;
+            for _ in 0..5 {
+                let before = (camera.azimuth_deg, camera.elevation_deg);
+                camera.orbit_input_by(5.0, -3.0);
+                let motion = camera.azimuth_deg - before.0;
+                assert!(motion > 0.0 && motion < previous);
+                assert!(((camera.elevation_deg - before.1) / motion + 0.6).abs() < 1e-4);
+                previous = motion;
+                camera.zoom_by(0.8);
+            }
+            // The nearest permitted view stays responsive and uses the focus distance.
+            camera.zoom_by(0.001);
+            let before = camera.azimuth_deg;
+            camera.orbit_input_by(5.0, 0.0);
+            assert!((camera.azimuth_deg - before) < 0.5);
+            assert!(camera.azimuth_deg > before);
+            // Programmed angular motion is independent of zoom.
+            let before = camera.azimuth_deg;
+            camera.orbit_by(5.0, 0.0);
+            assert!((camera.azimuth_deg - before - 5.0).abs() < 1e-4);
+        }
     }
 
     #[test]

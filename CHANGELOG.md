@@ -6,6 +6,13 @@ change behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mouse drag and arrows slow down when zooming toward Earth or the vehicle;
+  fixed-FOV VIEW free-look and programmed kiosk drift retain their own rates.
+- Magnified coastline annotations fade in close views instead of expanding
+  into broad stair-stepped outlines. The underlying imagery is unchanged.
+
 ### Added
 
 - Real 16K day / 8K night Earth imagery, with low/medium/high/auto startup quality,

@@ -501,14 +501,24 @@ impl Console {
             }
             KeyInput::Tab => self.cycle_sub(1),
             KeyInput::BackTab => self.cycle_sub(-1),
-            KeyInput::Left => self.camera.orbit_by(-ARROW_STEP_DEG, 0.0),
-            KeyInput::Right => self.camera.orbit_by(ARROW_STEP_DEG, 0.0),
-            KeyInput::Up => self.camera.orbit_by(0.0, ARROW_STEP_DEG),
-            KeyInput::Down => self.camera.orbit_by(0.0, -ARROW_STEP_DEG),
+            KeyInput::Left => self.orbit_input_by(-ARROW_STEP_DEG, 0.0),
+            KeyInput::Right => self.orbit_input_by(ARROW_STEP_DEG, 0.0),
+            KeyInput::Up => self.orbit_input_by(0.0, ARROW_STEP_DEG),
+            KeyInput::Down => self.orbit_input_by(0.0, -ARROW_STEP_DEG),
             KeyInput::Char(c) => return self.handle_char(c.to_ascii_lowercase(), world),
             _ => {}
         }
         Outcome::Continue
+    }
+
+    /// All manual orbit inputs share zoom sensitivity. VIEW free-look has a fixed
+    /// field of view, so an orbit-map distance must not alter its yaw/pitch speed.
+    pub fn orbit_input_by(&mut self, az_deg: f32, el_deg: f32) {
+        if self.page == Page::View {
+            self.camera.orbit_by(az_deg, el_deg);
+        } else {
+            self.camera.orbit_input_by(az_deg, el_deg);
+        }
     }
 
     fn handle_char(&mut self, c: char, world: &World) -> Outcome {
@@ -1270,6 +1280,24 @@ mod tests {
         assert!(rx.try_recv().is_err(), "keys do nothing while help is open");
         assert_eq!(c.handle_key(KeyInput::Escape, &w), Outcome::Continue);
         assert!(!c.help);
+    }
+
+    #[test]
+    fn arrows_and_drag_share_zoom_sensitivity_but_view_look_is_independent() {
+        let (mut c, _rx) = console();
+        let w = world();
+        c.camera.zoom_by(0.01);
+        let before = c.camera.azimuth_deg;
+        c.handle_key(KeyInput::Right, &w);
+        let step = c.camera.azimuth_deg - before;
+        assert!(step > 0.0 && step < 0.5);
+        c.orbit_input_by(ARROW_STEP_DEG, 0.0);
+        assert!((c.camera.azimuth_deg - before - 2.0 * step).abs() < 1e-4);
+        c.page = Page::View;
+        c.sub = 3;
+        let before = c.camera.azimuth_deg;
+        c.handle_key(KeyInput::Right, &w);
+        assert!((c.camera.azimuth_deg - before - ARROW_STEP_DEG).abs() < 1e-4);
     }
 
     #[test]

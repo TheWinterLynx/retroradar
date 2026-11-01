@@ -863,6 +863,94 @@ mod tests {
             }
         }
 
+        /// A fixed test orbit over the Aegean; never presented as live telemetry.
+        /// Compare coast colours to measure only the annotation's contribution.
+        #[test]
+        #[ignore = "needs a GPU adapter; run in the local graphical gate"]
+        fn coast_overlay_fades_in_close_view_but_remains_in_overview() {
+            use retroradar_core::state::{Quality, SourceKind, State};
+            use retroradar_core::world::Solution;
+            let live = live();
+            let mut world = (*live.bus.latest()).clone();
+            let (lat, lon) = (38.0_f64.to_radians(), 26.0_f64.to_radians());
+            let r = 6378.137 + 420.0;
+            let state = State::new(
+                [
+                    r * lat.cos() * lon.cos(),
+                    r * lat.cos() * lon.sin(),
+                    r * lat.sin(),
+                ],
+                [-7.6 * lon.sin(), 7.6 * lon.cos(), 0.0],
+            );
+            world.vehicles[0].solution = Some(Solution {
+                source: SourceKind::Gp,
+                quality: Quality::Pred,
+                state_gcrf: state,
+                state_itrf: state,
+                geodetic: retroradar_astro::kepler::geodetic(&state.r),
+                elements: retroradar_astro::kepler::elements(&state).unwrap(),
+                sun_gcrf_km: [-1.5e8, 0.0, 0.0],
+                beta_deg: 0.0,
+                illumination: 0.0,
+                gmst_rad: 0.0,
+                ecef_from_gcrf: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            });
+            live.bus.publish(world);
+            let mut off = Offline::new(
+                &live,
+                crate::theme::embedded().unwrap(),
+                Some("modern"),
+                [1280, 720],
+                false,
+                true,
+                crate::EarthQuality::Auto,
+            )
+            .unwrap();
+            off.console.toggles = EffectToggles::all(false);
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/earth-close-v1.0");
+            std::fs::create_dir_all(&dir).unwrap();
+            let mut counts = Vec::new();
+            for (page, name) in [
+                (crate::pages::Page::Traj, "overview"),
+                (crate::pages::Page::View, "nadir"),
+            ] {
+                off.console.page = page;
+                off.console.sub = 0;
+                let mut images = Vec::new();
+                for value in [1.0, 0.0] {
+                    let mut style = off.console.theme().globe.clone();
+                    style.coast = crate::theme::Rgb([value; 3]);
+                    off.renderer.globe_mut().set_style(style);
+                    off.frame(4, 16.7).unwrap();
+                    off.frame(4, 16.7).unwrap();
+                    images.push(off.capture().unwrap());
+                }
+                images[0].save(dir.join(format!("{name}.png"))).unwrap();
+                let changed = (100..640)
+                    .flat_map(|y| (0..1280).map(move |x| (x, y)))
+                    .filter(|&(x, y)| {
+                        images[0]
+                            .get_pixel(x, y)
+                            .0
+                            .iter()
+                            .zip(images[1].get_pixel(x, y).0)
+                            .take(3)
+                            .any(|(a, b)| a.abs_diff(b) > 8)
+                    })
+                    .count();
+                counts.push(changed);
+            }
+            assert!(
+                counts[0] > 100,
+                "coast overlay must remain in overview: {counts:?}"
+            );
+            assert!(
+                counts[1] < counts[0] / 20,
+                "magnified mask must fade in nadir: {counts:?}"
+            );
+            println!("Coast-affected pixels overview / nadir: {counts:?}");
+        }
+
         /// Renders fixed pages from a fixed world and compares them with `tests/golden`. Needs a GPU adapter,
         /// and a software one is fine: `cargo test -p retroradar-gui golden -- --ignored`. After an intended change
         /// to how things look, `RETRORADAR_BLESS=1` rewrites the golden images; review them in the diff.

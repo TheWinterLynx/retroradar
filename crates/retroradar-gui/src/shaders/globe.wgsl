@@ -122,7 +122,13 @@ fn fs_sphere(in: FullOut) -> FsOut {
     let city_col = select(CITY_LIGHT, u.day_tint.rgb, u.viewport.w > 0.5) * city * 1.3;
     var col = mix(night_col, day_col, day) + city_col * (1.0 - day);
     col = max(col, u.night_tint.rgb * u.shade.x);
-    col = mix(col, u.coast.rgb, coast * u.coast.a);
+    // A cartographic raster line becomes a wide staircase when viewed from low
+    // orbit. Fade this annotation once one mask texel spans 1..4 screen pixels;
+    // retain the day/night imagery at its actual available resolution.
+    let coast_size = vec2<f32>(textureDimensions(coast_tex));
+    let coast_footprint = max(length(dx * coast_size), length(dy * coast_size));
+    let coast_visibility = smoothstep(0.25, 1.0, coast_footprint);
+    col = mix(col, u.coast.rgb, coast * u.coast.a * coast_visibility);
     col = mix(col, u.graticule.rgb, grat * u.graticule.a);
     // The atmosphere: a blue band at the limb, strong where the Sun lights it and faint in the dark.
     let atm_col = select(SKY_BLUE, mix(u.night_tint.rgb, u.day_tint.rgb, 0.7), u.viewport.w > 0.5);

@@ -406,7 +406,7 @@ impl ApplicationHandler for App {
                 if let (true, Some(prev), Some(r)) =
                     (self.dragging, self.last_cursor, self.running.as_mut())
                 {
-                    r.console.camera.orbit_by(
+                    r.console.orbit_input_by(
                         -(now.0 - prev.0) * DRAG_DEG_PER_PX,
                         (now.1 - prev.1) * DRAG_DEG_PER_PX,
                     );

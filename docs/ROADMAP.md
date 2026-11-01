@@ -3,7 +3,7 @@
 | Slice | Scope | Acceptance |
 |---|---|---|
 | R01 | Preserve retroradar; Windows platform boundaries; portable storage; doctor; desktop kiosk | Local Windows tests, release build, GPU smoke and visual acceptance pending |
-| R01 HD | Real 16K day / 8K night textures; startup quality; GPU dimension caps | Automated regressions and explicit HD decode; local Windows high-quality GPU and visual acceptance pending |
+| R01 HD | Real 16K day / 8K night textures; startup quality; GPU dimension caps; zoom-sensitive navigation and close-view coast filtering | Automated regressions and explicit HD decode; local Windows high-quality GPU and visual acceptance pending |
 | R02 | Editable observer and source settings from UI; saved site profiles | Persist/reload, coordinate validation, no blocking UI work |
 | R03 | Configurable satellite catalogue and favourites beyond built-in spacecraft | Real element sets, freshness labels, selection and pass predictions |
 | R04 | Pass alerts and observation agenda | Local notifications, horizon mask and visible-pass criteria |

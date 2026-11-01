@@ -91,7 +91,9 @@ se limita a 2048 × 1024 de día y 1024 × 512 de noche. La terminal y SYS muest
 la resolución efectiva. Cambiar de nivel requiere reiniciar. `high` necesita unos
 896 MiB de texturas con mipmaps, aparte de los demás recursos gráficos; `auto`
 es conservador y no mide la VRAM libre. El detalle resulta más visible al acercar
-la cámara y con el tema Modern, que muestra el mapa en color.
+la cámara y con el tema Modern, que muestra el mapa en color. El arrastre y las
+flechas reducen su sensibilidad al acercar el globo. VIEW/NADIR comparte las mismas
+texturas; las costas superpuestas se atenúan al ampliarlas para evitar escalones.
 
 Las imágenes NASA se han reducido desde originales mayores, sin ampliar píxeles.
 Son mapas estáticos de 2004 (día) y 2012 (noche). Véase

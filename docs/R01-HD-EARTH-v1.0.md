@@ -44,7 +44,8 @@ Credits and usage terms remain in `assets/LICENSES.md` and the embedded notices.
 Close running RetroRadar processes before updating/building. Run
 `scripts/gate-r01-v1.0.ps1` from a clean checkout. It explicitly decodes both
 largest JPEGs, checks dimensions and quality fallback, runs all regressions,
-builds release, runs doctor and starts a 120-frame offline window with high quality.
+builds release, runs doctor, checks close-view coast fading on the GPU and starts
+a 120-frame offline window with high quality.
 External services are not required. With no cached orbit, NO DATA is expected.
 `-SkipGpu` leaves graphical acceptance pending.
 
@@ -55,3 +56,22 @@ resize and camera motion. Compare with `--earth-quality low` at the same camera.
 A 16K texture increases detail when zoomed; it does not change window resolution
 or guarantee a frame-rate increase. Report the commit with R01 FULL GATE GREEN
 only after the local GPU and visual review succeeds. No merge before that report.
+
+## Close-view follow-up
+
+VIEW/NADIR and orbit-map panels share the same globe pass and textures. There is
+no separate low-resolution VIEW texture. The cartographic coastline mask fades
+under magnification: fully visible at one or more mask texels per screen pixel,
+invisible when a mask texel covers four or more screen pixels. Day/night imagery
+is unchanged. Night 8K has roughly 4.9 km per texel at the equator; low-orbit
+views inevitably magnify that finite detail.
+
+Manual drag and arrows use zoom-sensitive angular steps for both focus modes.
+Earth sensitivity follows surface clearance, vehicle sensitivity follows distance
+to the vehicle, capped at the normal overview speed. Fixed-FOV VIEW free-look,
+programmed kiosk drift and physical orbital motion retain their existing rates.
+
+The graphical gate renders a fixed test orbit over the Aegean, changes the coast
+colour and compares pixels: the overlay must remain visible in overview and fade
+in NADIR. Test screenshots are kept under `target/earth-close-v1.0`; they use a
+test-only orbit, never a live feed.
