@@ -18,12 +18,12 @@ with checksums. Nothing is published until a tag is pushed.
 6. **Tag and push the tag:**
 
    ```
-   git tag -a vX.Y.Z -m "mctl X.Y.Z"
+   git tag -a vX.Y.Z -m "retroradar X.Y.Z"
    git push origin vX.Y.Z
    ```
 7. **Check the release page:** both tarballs and their `.sha256` files are there. Download one, check it with
-   `sha256sum -c`, unpack it and run `./mctl --version` and `./mctl about`. On a Raspberry Pi, try the aarch64
-   one with `mctl --pi`.
+   `sha256sum -c`, unpack it and run `./retroradar --version` and `./retroradar about`. On a Raspberry Pi, try the aarch64
+   one with `retroradar --pi`.
 
 ## Rolling back
 

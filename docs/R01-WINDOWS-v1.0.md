@@ -1,52 +1,42 @@
 # R01 Windows adaptation v1.0
 
-Changes relative to upstream bf7072fdf1080fec6890a9889531e78297e491eb:
+RetroRadar provides a Windows-native Rust console with orbital pages, telemetry,
+pass predictions, recording/replay, desktop kiosk and portable storage.
 
-| File | Change |
+| Area | Implementation |
 |---|---|
-| Cargo.toml / Cargo.lock | Public package retroradar, same pinned dependency graph |
-| src/main.rs | Portable root initialization before workers; read-only doctor; desktop kiosk; terminal logging |
-| mctl-core/src/config.rs | Process-wide immutable portable root; application directories isolated from mctl |
-| mctl-gui/src/app.rs | X11/WSL code compiled only on Linux; RetroRadar window title |
-| mctl-sources/Cargo.toml, src/lib.rs, src/observer.rs | D-Bus dependency/module isolated to Linux; explicit unsupported-location note elsewhere |
-| mctl-gui/src/about.rs, src/screens.rs | Preserve attribution; replace Linux-only user path advice |
-| tests/cli.rs, tests/portable.rs | Executable identity; isolated read-only doctor and invalid configuration regressions |
-| scripts/gate-r01-v1.0.ps1 | Fail-fast Windows acceptance with visible progress and unique temporary data root |
-| .github/workflows/rustfmt.yml | Formatting only; upstream CI/release workflows excluded |
+| Identity | retroradar executable, retroradar-* crates, title, helper names and app directories |
+| Storage | Immutable portable root initialized before workers; native profile paths otherwise |
+| Window | winit native Windows window; X11/WSL isolated to Linux |
+| Location | Configured sites on Windows; GeoClue/D-Bus isolated to Linux |
+| Diagnostics | Terminal output; read-only doctor; no application log files |
+| TLS | Explicit RustCrypto providers for HTTP/WSS; certificate/name verification enabled |
+| Native exception | SQLite only in the active Windows compiler-dependency tree |
+| Acceptance | Local PowerShell gate; GitHub Actions exclusively rustfmt |
 
-The portable root is set once before configuration or background workers start;
-there is no unsafe process environment mutation. Without an explicit root, the
-`directories` crate uses native platform locations. The original internal crate
-names and upstream source versions remain unchanged to keep the delta reviewable.
+## Windows path regression
 
-Kiosk reuses the existing scene renderer. It does not yet provide a new desktop
-layout or editable settings. GeoClue is skipped on Windows; manual sites and the
-existing optional IP adapter retain the upstream resolution order.
+The first Windows gate exposed a test defect: it compared a printed native path
+against a string containing a literal forward slash in `config/config.toml`.
+The application reported the correct Windows config directory. Tests now construct
+path components separately and parse reported paths as Path values; config, cache,
+data and no-write assertions remain enabled. The invalid-TOML fixture uses native
+component joins as well.
 
-Tests for doctor use child processes and unique paths. They assert resolved paths,
-no filesystem writes, and rejection of invalid TOML. Windows runtime/GPU and real
-source connectivity require owner acceptance independently of Linux tests.
+## Validation
 
-## Agent validation (2026-11-01)
+The workspace regression suite passes on Linux x86_64 with Rust 1.95.0 and
+RUSTFLAGS=-Dwarnings: 336 passed, 0 failed, 6 normally ignored. Formatting and release
+build are checked for the current revision. The active Windows dependency tree
+contains no ring/aws-lc/OpenSSL; SQLite is the only cc consumer.
+Windows owner acceptance remains pending after the reported regression.
+Linux checks do not establish Windows GPU or PowerShell acceptance.
 
-Linux x86_64, Rust 1.95.0: `cargo fmt --all -- --check` passed;
-`RUSTFLAGS=-Dwarnings cargo test --locked --workspace --all-targets` passed
-(332 passed, 0 failed, 6 ignored); release binary build passed with the same warning
-policy. Portable doctor passed without creating its data root. Dependency lock
-versions and checksums match upstream; only the root package name changed.
+See RUST-DEPENDENCIES-v1.0.md for the alpha TLS provider's production limitation,
+ROADMAP.md for planned functionality, and ../NOTICE.md for legal notices.
 
-Windows MSVC build, PowerShell gate execution, Windows GPU smoke, all-page visual
-acceptance and real-source connectivity have not been run here. They remain owner
-gates; Linux success is not Windows acceptance. Inherited ignored tests remain
-ignored because they require external fixtures, GeoClue or rendering acceptance.
-
-## R01 Rust-only policy revision (2026-11-01)
-
-Owner permits SQLite as the native-code exception. Replaced ring with explicit
-RustCrypto providers for every HTTP agent and the WebSocket client. Added TLS
-handshake/certificate regressions and the active Windows dependency-policy gate.
-336 tests passed with warnings denied; the Windows dependency tree has no active
-ring/aws-lc/OpenSSL and libsqlite3-sys is the only cc consumer.
-See RUST-DEPENDENCIES-v1.0.md for the alpha provider's production limitation.
-The previous 332-test/dependency-equality result above describes the original R01
-head, not this dependency revision. Windows owner acceptance remains pending.
+The six rendered regression references were regenerated with RetroRadar branding,
+visually inspected for the About/Credits/kiosk identity, and compared again without
+reference regeneration. This headless Linux rendering check is separate from the
+owner's Windows window/GPU gate. The local gate now runs portable-path regressions
+before the full workspace to surface this failure directly.

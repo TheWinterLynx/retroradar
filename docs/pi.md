@@ -1,6 +1,6 @@
 # The Raspberry Pi / Commodore 1702 display
 
-`mctl --pi` is a second front end for the same engine, made to be looked at rather than operated: big line
+`retroradar --pi` is a second front end for the same engine, made to be looked at rather than operated: big line
 art, a few large numbers, and a cycle through the vehicles. It is for a small composite CRT such as a
 Commodore 1702.
 
@@ -52,33 +52,33 @@ Keys: `V` or Right next scene, Left previous, Space hold or resume the cycle, `Q
 
 ## Setting up a Pi
 
-Not verified on a Pi: this was built and looked at on a desktop with `mctl --pi shot`. Treat the following as
+Not verified on a Pi: this was built and looked at on a desktop with `retroradar --pi shot`. Treat the following as
 a starting point.
 
 1. A Pi 4 or 5 on Raspberry Pi OS (64-bit) with the Vulkan driver (`mesa-vulkan-drivers`, which provides `v3dv`).
    wgpu needs Vulkan; a Pi 3 or earlier has none.
-2. Build on the Pi (`cargo build --release -p mctl`); there is no cross-compile setup. The default build needs
+2. Build on the Pi (`cargo build --release -p retroradar`); there is no cross-compile setup. The default build needs
    only the GPU stack and libc.
 3. Composite output. In `/boot/firmware/config.txt` enable the composite connector and pick the standard,
    for example `dtoverlay=vc4-kms-v3d,composite` with `video=Composite-1:720x480@60ie` on the kernel command
    line (NTSC; use `720x576@50ie` for PAL), and `enable_tvout=1` on a Pi 4. The 1702 is a 4:3 tube, so 640x480
    keeps square pixels. If the picture does not fill the tube, change `--size`, not the theme.
 4. A compositor is needed for the window: `cage` (a single-application Wayland kiosk compositor) is the
-   simplest: `cage -- mctl --pi`.
+   simplest: `cage -- retroradar --pi`.
 
-The network is the only other need: with no network, `mctl --pi --offline` runs from the cache.
+The network is the only other need: with no network, `retroradar --pi --offline` runs from the cache.
 
 ## Running it as a service
 
-`packaging/pi/install-display.sh` installs a systemd unit that runs `cage -- mctl --pi` on the Pi's first screen:
+`packaging/pi/install-display.sh` installs a systemd unit that runs `cage -- retroradar --pi` on the Pi's first screen:
 
 ```
-sudo packaging/pi/install-display.sh --user pi --bin /home/pi/mctl/bin/mctl --enable
+sudo packaging/pi/install-display.sh --user pi --bin /home/pi/retroradar/bin/retroradar --enable
 ```
 
 (`--user` is the account to run as, `--bin` the aarch64 binary; `--dry-run` prints the unit.) It needs
 `cage` and `seatd`. For a display-only Pi, also boot without the desktop:
-`sudo systemctl set-default multi-user.target`. `--pi` caps the frame rate at 20 (`--max-fps` overrides) and
+`sudo systeretroradar set-default multi-user.target`. `--pi` caps the frame rate at 20 (`--max-fps` overrides) and
 turns on `--allow-software`, since a Pi 3 has no Vulkan GPU and runs Mesa's software renderer (llvmpipe). The
 CRT themes draw "flat" (no glow passes or line anti-aliasing), and a software adapter gets a 2048 px Earth
 texture.

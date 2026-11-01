@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Render every page headless to PNG and check each image is a real, distinct render (no panic, image
 # review). Needs a GPU adapter (a software Vulkan one is enough).
-# Usage: tools/smoke.sh [path/to/mctl]   (default: target/release/mctl)
+# Usage: tools/smoke.sh [path/to/retroradar]   (default: target/release/retroradar)
 # SMOKE_SOFTWARE=1 allows a software (CPU) adapter, which is all a CI runner has.
 set -euo pipefail
-bin="${1:-target/release/mctl}"
+bin="${1:-target/release/retroradar}"
 soft=()
 [ "${SMOKE_SOFTWARE:-0}" = 1 ] && soft=(--allow-software)
 out="$(mktemp -d)"

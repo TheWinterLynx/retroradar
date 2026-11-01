@@ -1960,10 +1960,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-astro"
+name = "retroradar-astro"
 version = "0.1.1"
 dependencies = [
- "mctl-core",
+ "retroradar-core",
  "nalgebra 0.35.0",
  "ode_solvers",
  "proptest",
@@ -1975,7 +1975,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-core"
+name = "retroradar-core"
 version = "0.1.1"
 dependencies = [
  "arc-swap",
@@ -1990,7 +1990,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-gui"
+name = "retroradar-gui"
 version = "0.1.1"
 dependencies = [
  "anyhow",
@@ -2000,10 +2000,10 @@ dependencies = [
  "egui-winit",
  "glam 0.34.1",
  "image",
- "mctl-astro",
- "mctl-core",
- "mctl-sim",
- "mctl-sources",
+ "retroradar-astro",
+ "retroradar-core",
+ "retroradar-sim",
+ "retroradar-sources",
  "pollster",
  "proptest",
  "serde",
@@ -2016,13 +2016,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-sim"
+name = "retroradar-sim"
 version = "0.1.1"
 dependencies = [
- "mctl-astro",
- "mctl-core",
- "mctl-sources",
- "mctl-store",
+ "retroradar-astro",
+ "retroradar-core",
+ "retroradar-sources",
+ "retroradar-store",
  "nalgebra 0.35.0",
  "serde_json",
  "tempfile",
@@ -2030,14 +2030,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-sources"
+name = "retroradar-sources"
 version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
  "futures-util",
- "mctl-astro",
- "mctl-core",
+ "retroradar-astro",
+ "retroradar-core",
  "proptest",
  "rustls",
  "rustls-rustcrypto",
@@ -2054,10 +2054,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-store"
+name = "retroradar-store"
 version = "0.1.1"
 dependencies = [
- "mctl-core",
+ "retroradar-core",
  "rusqlite",
  "serde_json",
  "tempfile",
@@ -2066,7 +2066,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mctl-tui"
+name = "retroradar-tui"
 version = "0.1.1"
 
 [[package]]
@@ -3295,11 +3295,11 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
- "mctl-core",
- "mctl-gui",
- "mctl-sim",
- "mctl-sources",
- "mctl-store",
+ "retroradar-core",
+ "retroradar-gui",
+ "retroradar-sim",
+ "retroradar-sources",
+ "retroradar-store",
  "tokio",
  "tracing",
  "tracing-subscriber",

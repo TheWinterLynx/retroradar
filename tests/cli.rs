@@ -3,13 +3,16 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
-fn mctl() -> Command {
+fn retroradar() -> Command {
     Command::new(env!("CARGO_BIN_EXE_retroradar"))
 }
 
 #[test]
 fn version_prints_the_package_version() {
-    let out = mctl().arg("--version").output().expect("run mctl");
+    let out = retroradar()
+        .arg("--version")
+        .output()
+        .expect("run retroradar");
     assert!(out.status.success());
     let text = String::from_utf8(out.stdout).expect("utf-8");
     assert!(text.contains(env!("CARGO_PKG_VERSION")), "{text}");
@@ -17,30 +20,30 @@ fn version_prints_the_package_version() {
 
 #[test]
 fn about_prints_the_licence_the_credits_and_the_notices() {
-    let out = mctl().arg("about").output().expect("run mctl");
+    let out = retroradar().arg("about").output().expect("run retroradar");
     assert!(out.status.success());
     let text = String::from_utf8(out.stdout).expect("utf-8");
     for needle in [
         "GNU General Public License",
-        "Liam Droog",
-        "Claude",
+        "TheWinterLynx",
+        "NOTICE.md",
         "Third-party notices",
         "MIT License",
         "SIL Open Font License",
     ] {
-        assert!(text.contains(needle), "`mctl about` lacks {needle:?}");
+        assert!(text.contains(needle), "`retroradar about` lacks {needle:?}");
     }
 }
 
-/// `mctl about | head` closes the pipe long before the notices end; that must not be reported as a crash.
+/// `retroradar about | head` closes the pipe long before the notices end; that must not be reported as a crash.
 #[test]
 fn about_is_not_a_crash_when_its_reader_goes_away() {
-    let mut child = mctl()
+    let mut child = retroradar()
         .arg("about")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("run mctl");
+        .expect("run retroradar");
     let stdout = child.stdout.take().expect("piped stdout");
     let mut first = String::new();
     BufReader::new(stdout)
@@ -48,8 +51,8 @@ fn about_is_not_a_crash_when_its_reader_goes_away() {
         .expect("read a line");
     assert!(first.starts_with("retroradar "), "{first:?}");
     // The reader is dropped here with most of the output (far more than a pipe holds) unread.
-    let out = child.wait_with_output().expect("wait for mctl");
+    let out = child.wait_with_output().expect("wait for retroradar");
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(!err.contains("panicked"), "mctl panicked: {err}");
+    assert!(!err.contains("panicked"), "retroradar panicked: {err}");
     assert!(out.status.success(), "exit status {:?}: {err}", out.status);
 }

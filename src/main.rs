@@ -1,4 +1,4 @@
-//! `mctl`: mission control display. One binary: the console (default), plus `check`, `shot`,
+//! `retroradar`: mission control display. One binary: the console (default), plus `check`, `shot`,
 //! `bench` and `isslive` subcommands.
 
 use std::path::PathBuf;
@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
-use mctl_core::bus::Bus;
-use mctl_core::config::{self, Config};
-use mctl_core::world::EopView;
-use mctl_gui::Live;
+use retroradar_core::bus::Bus;
+use retroradar_core::config::{self, Config};
+use retroradar_core::world::EopView;
+use retroradar_gui::Live;
 use tracing_subscriber::EnvFilter;
 
 const DEFAULT_WINDOW_SIZE: &str = "1920x1080";
@@ -34,9 +34,9 @@ fn default_size(pi: bool) -> &'static str {
 }
 
 /// The themes to run with: the CRT theme alone for `--pi`, else the embedded or `--themes-dir` set.
-fn themes_for(pi: bool, dir: &Option<PathBuf>) -> anyhow::Result<Vec<mctl_gui::Theme>> {
+fn themes_for(pi: bool, dir: &Option<PathBuf>) -> anyhow::Result<Vec<retroradar_gui::Theme>> {
     if pi {
-        return Ok(mctl_gui::crt_themes()?);
+        return Ok(retroradar_gui::crt_themes()?);
     }
     load_themes(dir)
 }
@@ -51,7 +51,7 @@ enum PiStyleArg {
     Dense,
 }
 
-impl From<PiStyleArg> for mctl_gui::KioskStyle {
+impl From<PiStyleArg> for retroradar_gui::KioskStyle {
     fn from(s: PiStyleArg) -> Self {
         match s {
             PiStyleArg::Mixed => Self::Mixed,
@@ -113,7 +113,7 @@ struct Cli {
     #[arg(long, global = true)]
     max_fps: Option<f32>,
     /// With `--pi`, seconds each vehicle stays up.
-    #[arg(long, global = true, default_value_t = mctl_gui::KIOSK_DEFAULT_DWELL_S)]
+    #[arg(long, global = true, default_value_t = retroradar_gui::KIOSK_DEFAULT_DWELL_S)]
     dwell: f64,
     #[command(subcommand)]
     command: Option<Command>,
@@ -235,7 +235,7 @@ fn init_logging() {
         .init();
 }
 
-/// The recording database path: the configured one, else `$XDG_DATA_HOME/mctl/mctl.db`.
+/// The recording database path: the configured one, else `$XDG_DATA_HOME/retroradar/retroradar.db`.
 fn db_path(cfg: &Config) -> Result<PathBuf> {
     if !cfg.store.path.is_empty() {
         return Ok(PathBuf::from(&cfg.store.path));
@@ -251,8 +251,8 @@ fn start_live(
     vehicle: Option<&str>,
     offline: bool,
     record: bool,
-) -> Result<(Live, mctl_sim::engine::Engine)> {
-    mctl_gui::check_keys(&cfg.keys).map_err(|e| anyhow::anyhow!(e))?;
+) -> Result<(Live, retroradar_sim::engine::Engine)> {
+    retroradar_gui::check_keys(&cfg.keys).map_err(|e| anyhow::anyhow!(e))?;
     let vehicle_id = match vehicle {
         Some(v) if cfg.vehicles.iter().any(|d| d.id == v) => v.to_owned(),
         Some(v) => bail!(
@@ -266,13 +266,14 @@ fn start_live(
     };
     let cache =
         config::cache_dir().context("cannot determine a cache directory (no home directory?)")?;
-    let sources = mctl_sources::tasks::start(cfg, cache, offline).context("starting sources")?;
+    let sources =
+        retroradar_sources::tasks::start(cfg, cache, offline).context("starting sources")?;
     let recorder = if record && cfg.store.enabled {
         let path = db_path(cfg)?;
-        let store = mctl_store::Store::open(&path)
+        let store = retroradar_store::Store::open(&path)
             .with_context(|| format!("opening the recording database {}", path.display()))?;
         tracing::info!(path = %path.display(), "recording");
-        Some(mctl_store::Recorder::start(
+        Some(retroradar_store::Recorder::start(
             store,
             cfg.store.retention_days * 86_400.0,
             (cfg.store.max_size_mb * 1_048_576.0) as u64,
@@ -285,7 +286,7 @@ fn start_live(
     } else {
         None
     };
-    let engine = mctl_sim::engine::start(cfg.clone(), sources, recorder, trends_db);
+    let engine = retroradar_sim::engine::start(cfg.clone(), sources, recorder, trends_db);
     Ok((
         Live {
             bus: engine.bus.clone(),
@@ -336,14 +337,14 @@ fn wait_for_data(bus: &Arc<Bus>, vehicle_id: &str, wait_s: f64) {
 
 /// `--themes-dir` replaces the set; otherwise the embedded themes plus any `*.toml` in the user's
 /// `themes/` directory (a user theme with an embedded theme's name replaces it).
-fn load_themes(dir: &Option<PathBuf>) -> Result<Vec<mctl_gui::Theme>> {
+fn load_themes(dir: &Option<PathBuf>) -> Result<Vec<retroradar_gui::Theme>> {
     if let Some(d) = dir {
-        return mctl_gui::themes_from_dir(d).context("loading themes");
+        return retroradar_gui::themes_from_dir(d).context("loading themes");
     }
-    let mut themes = mctl_gui::embedded_themes().context("loading embedded themes")?;
+    let mut themes = retroradar_gui::embedded_themes().context("loading embedded themes")?;
     let user_dir = config::user_config_path().and_then(|p| p.parent().map(|d| d.join("themes")));
     if let Some(d) = user_dir.filter(|d| d.is_dir()) {
-        for t in mctl_gui::themes_from_dir(&d)
+        for t in retroradar_gui::themes_from_dir(&d)
             .with_context(|| format!("loading user themes from {}", d.display()))?
         {
             match themes
@@ -364,12 +365,12 @@ fn run_isslive(
     duration_s: Option<f64>,
     quiet: bool,
 ) -> Result<()> {
-    use mctl_sources::isslive::{config::Config as IssConfig, run_cli};
+    use retroradar_sources::isslive::{config::Config as IssConfig, run_cli};
     // `--demo` swaps in the ticking public demo feed, which proves the client independently of ISSLIVE's state.
     let demo_cfg;
     let path = match (demo, config_path) {
         (true, None) => {
-            demo_cfg = std::env::temp_dir().join("mctl-isslive-demo.toml");
+            demo_cfg = std::env::temp_dir().join("retroradar-isslive-demo.toml");
             std::fs::write(&demo_cfg, include_str!("../config/isslive-demo.toml"))
                 .context("writing demo config")?;
             Some(demo_cfg.clone())
@@ -396,7 +397,7 @@ fn main() -> Result<()> {
     init_logging();
     if matches!(cli.command, Some(Command::Doctor)) {
         let cfg = Config::load().context("loading configuration")?;
-        mctl_gui::check_keys(&cfg.keys).map_err(anyhow::Error::msg)?;
+        retroradar_gui::check_keys(&cfg.keys).map_err(anyhow::Error::msg)?;
         println!("RETRORADAR R01 DOCTOR OK");
         println!(
             "platform: {} / {}",
@@ -445,27 +446,27 @@ fn main() -> Result<()> {
             let path = db_path(&cfg)?;
             anyhow::ensure!(
                 path.exists(),
-                "no recording at {}; run mctl first",
+                "no recording at {}; run retroradar first",
                 path.display()
             );
-            let store = mctl_store::Store::open(&path)
+            let store = retroradar_store::Store::open(&path)
                 .with_context(|| format!("opening {}", path.display()))?;
             let parse = |s: &str| {
-                mctl_core::time::Utc::parse(s.trim_end_matches('Z'))
+                retroradar_core::time::Utc::parse(s.trim_end_matches('Z'))
                     .with_context(|| format!("bad time {s:?}; expected 2026-10-23T00:00:00"))
             };
             let from = from
                 .as_deref()
-                .map_or(Ok(mctl_core::time::Utc(0.0)), parse)?;
+                .map_or(Ok(retroradar_core::time::Utc(0.0)), parse)?;
             let to = match to.as_deref() {
                 Some(t) => parse(t)?,
-                None => mctl_core::time::Utc::now()?,
+                None => retroradar_core::time::Utc::now()?,
             };
             let Some(table) = table else {
                 let dir = out.context("exporting every table needs --out <directory>")?;
                 std::fs::create_dir_all(&dir)
                     .with_context(|| format!("creating {}", dir.display()))?;
-                for t in mctl_store::TABLES {
+                for t in retroradar_store::TABLES {
                     let p = dir.join(format!("{t}.csv"));
                     let mut f = std::io::BufWriter::new(
                         std::fs::File::create(&p)
@@ -491,9 +492,13 @@ fn main() -> Result<()> {
         }
         Some(Command::About) => {
             use std::io::Write as _;
-            let text = format!("{}{THIRD_PARTY_NOTICES}\n", mctl_gui::about_text());
+            let text = format!(
+                "{}\n{}\n{THIRD_PARTY_NOTICES}\n",
+                retroradar_gui::about_text(),
+                include_str!("../NOTICE.md")
+            );
             match std::io::stdout().lock().write_all(text.as_bytes()) {
-                // `mctl about | head`: a reader that stops reading is not an error.
+                // `retroradar about | head`: a reader that stops reading is not an error.
                 Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
                 other => other.map_err(Into::into),
             }
@@ -525,7 +530,7 @@ fn main() -> Result<()> {
             if cli.offline {
                 bail!("`check` tests network connectivity; it cannot be combined with --offline");
             }
-            let lines = mctl_sources::tasks::check(&cfg, cache).context("preparing cache")?;
+            let lines = retroradar_sources::tasks::check(&cfg, cache).context("preparing cache")?;
             let mut failed = 0;
             for l in &lines {
                 println!(
@@ -575,9 +580,9 @@ fn main() -> Result<()> {
             }
             std::thread::sleep(Duration::from_secs_f64(settle_s.max(0.0)));
             let size = size.unwrap_or_else(|| default_size(cli.pi).to_owned());
-            let opts = mctl_gui::ShotOptions {
+            let opts = retroradar_gui::ShotOptions {
                 kiosk: cli.pi.then(|| cli.pi_style.into()),
-                size: mctl_gui::parse_size(&size)?,
+                size: retroradar_gui::parse_size(&size)?,
                 theme,
                 out_dir,
                 effects_off: fx_off,
@@ -587,7 +592,7 @@ fn main() -> Result<()> {
                 allow_software: cli.allow_software || cli.pi,
                 exec,
             };
-            mctl_gui::shots(&live, themes_for(cli.pi, &cli.themes_dir)?, &opts).map(|_| ())
+            retroradar_gui::shots(&live, themes_for(cli.pi, &cli.themes_dir)?, &opts).map(|_| ())
         }
         Some(Command::Bench {
             sizes,
@@ -602,12 +607,12 @@ fn main() -> Result<()> {
             wait_for_data(&live.bus, &live.vehicle_id, wait_s);
             let sizes = sizes
                 .iter()
-                .map(|s| mctl_gui::parse_size(s))
+                .map(|s| retroradar_gui::parse_size(s))
                 .collect::<Result<Vec<_>>>()?;
-            mctl_gui::bench(
+            retroradar_gui::bench(
                 &live,
                 load_themes(&cli.themes_dir)?,
-                &mctl_gui::BenchOptions {
+                &retroradar_gui::BenchOptions {
                     sizes,
                     frames,
                     warmup,
@@ -623,9 +628,10 @@ fn main() -> Result<()> {
             let (live, _engine) =
                 start_live(&cfg, cli.vehicle.as_deref(), cli.offline, !cli.no_record)?;
             if let Some(when) = &cli.replay {
-                let from = mctl_gui::parse_replay_start(Some(when)).map_err(anyhow::Error::msg)?;
+                let from =
+                    retroradar_gui::parse_replay_start(Some(when)).map_err(anyhow::Error::msg)?;
                 live.commands
-                    .send(mctl_core::command::Command::Replay(from))
+                    .send(retroradar_core::command::Command::Replay(from))
                     .map_err(|_| anyhow::anyhow!("the engine stopped before replay could start"))?;
             }
             let g = cli.gui;
@@ -633,19 +639,19 @@ fn main() -> Result<()> {
             let fullscreen =
                 g.fullscreen || ((cli.pi || cli.kiosk) && g.size.is_none() && !g.windowed);
             let size = g.size.unwrap_or_else(|| default_size(cli.pi).to_owned());
-            mctl_gui::run(
+            retroradar_gui::run(
                 themes_for(cli.pi, &cli.themes_dir)?,
-                mctl_gui::Options {
-                    size: mctl_gui::parse_size(&size)?,
+                retroradar_gui::Options {
+                    size: retroradar_gui::parse_size(&size)?,
                     fullscreen,
-                    kiosk: (cli.pi || cli.kiosk).then_some(mctl_gui::KioskConfig {
+                    kiosk: (cli.pi || cli.kiosk).then_some(retroradar_gui::KioskConfig {
                         dwell_s: cli.dwell,
                         mix: cli.pi_style.into(),
                     }),
                     present: match g.present {
-                        PresentArg::Fifo => mctl_gui::Present::Fifo,
-                        PresentArg::Immediate => mctl_gui::Present::Immediate,
-                        PresentArg::Mailbox => mctl_gui::Present::Mailbox,
+                        PresentArg::Fifo => retroradar_gui::Present::Fifo,
+                        PresentArg::Immediate => retroradar_gui::Present::Immediate,
+                        PresentArg::Mailbox => retroradar_gui::Present::Mailbox,
                     },
                     low_power: cli.low_power,
                     max_fps: cli.max_fps.or(cli.pi.then_some(PI_MAX_FPS)),

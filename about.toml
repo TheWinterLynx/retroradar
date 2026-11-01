@@ -17,7 +17,7 @@ accepted = [
     "MPL-2.0",
     "CDLA-Permissive-2.0",
 ]
-# The workspace's own crates are `publish = false`; they are mctl itself, not third-party.
+# The workspace's own crates are `publish = false`; they are retroradar itself, not third-party.
 private = { ignore = true }
 ignore-dev-dependencies = true
 ignore-build-dependencies = false

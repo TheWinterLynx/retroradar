@@ -45,7 +45,7 @@ Windows runtime policy. No Linux-only workaround is proof of a Windows build.
 TLS tests negotiate TLS 1.2 and 1.3 entirely in memory, reject an untrusted root,
 reject a wrong hostname, and check HTTP configuration retains verification and an
 explicit provider. Tests use a dedicated localhost certificate and test-only key
-under `crates/mctl-sources/fixtures/tls`, never the public root store. The test
+under `crates/retroradar-sources/fixtures/tls`, never the public root store. The test
 certificate was generated for these tests with a long validity; it is not a secret
 or an application credential. OpenSSL was only an offline fixture-generation tool;
 it is not an application dependency or required to run tests.

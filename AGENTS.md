@@ -1,7 +1,7 @@
 # RetroRadar engineering contract
 
 ## Product
-Windows-native Rust mission-control display, preserving mctl's pages, themes,
+Windows-native Rust mission-control display, with orbital pages, themes,
 orbital engine, sources and recording. Retain GPL-3.0-or-later, upstream credits,
 asset licences and provenance. This is an independent repository, never a GitHub fork.
 Missing values remain NO DATA; preserve LIVE/SIM/REPLAY and source-quality labels.
@@ -42,6 +42,6 @@ Network source checks are separate: an external outage is not a compiler regress
 Do not reset, stash or discard owner edits automatically.
 
 ## Architecture
-Keep reusable mctl-* crate names for now to reduce import churn. Public executable
-and application directories are retroradar. Refer to docs/UPSTREAM.md and
+Crate names, executable and application directories use retroradar.
+Refer to NOTICE.md and
  docs/ROADMAP.md before adding functionality. Update changed-file documentation.

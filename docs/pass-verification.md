@@ -1,7 +1,7 @@
 # Pass prediction cross-check
 
-Checked 2026-10-23, re-run 2026-10-29 at the NASA HQ site. `cargo test -p mctl-astro print_fixture_passes -- --ignored --nocapture` prints
-the passes mctl finds for the ISS OMM fixture over NASA HQ (38.883 N, 77.0163 W, 10 m), mask 10 deg,
+Checked 2026-10-23, re-run 2026-10-29 at the NASA HQ site. `cargo test -p retroradar-astro print_fixture_passes -- --ignored --nocapture` prints
+the passes retroradar finds for the ISS OMM fixture over NASA HQ (38.883 N, 77.0163 W, 10 m), mask 10 deg,
 first 24 h. `tools/xcheck_passes.py` (needs `pip install sgp4`) predicts the same passes with the
 python `sgp4` package, a plain GMST rotation and its own topocentric geometry.
 
@@ -21,7 +21,7 @@ predictor (Spot the Station, Heavens-Above), which would also test the element s
 
 ## Extended to a week (38 passes)
 
-Re-run over seven days (`xcheck_passes.py` and `print_fixture_passes` both set to 7 d): mctl and the
+Re-run over seven days (`xcheck_passes.py` and `print_fixture_passes` both set to 7 d): retroradar and the
 independent implementation each find 38 passes. Largest differences: AOS 0.003 s, LOS 0.003 s, TCA 0.46 s,
 max elevation 0.013 deg. the design document §12 asks for 20 passes within 10 s and 0.5 deg against NASA Spot the
 Station or an independent tool; this meets the numbers against an independent *implementation*, but

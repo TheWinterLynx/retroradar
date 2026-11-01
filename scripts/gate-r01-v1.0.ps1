@@ -27,6 +27,7 @@ Step 'Rust dependency policy (SQLite exception)' { & powershell -NoProfile -Exec
 $previousFlags = $env:RUSTFLAGS
 try {
     $env:RUSTFLAGS = '-Dwarnings'
+    Step 'Portable Windows paths' { cargo test --locked -p retroradar --test portable }
     Step 'Workspace regressions' { cargo test --locked --workspace --all-targets }
     Step 'Release binary' { cargo build --locked --release --bin retroradar }
     $portable = Join-Path ([System.IO.Path]::GetTempPath()) ('retroradar-r01-' + [guid]::NewGuid().ToString('N'))

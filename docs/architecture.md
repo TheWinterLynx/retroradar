@@ -1,6 +1,6 @@
 # Architecture
 
-mctl is a Cargo workspace. The rule that shapes it: **the user interface never touches a data source or a
+retroradar is a Cargo workspace. The rule that shapes it: **the user interface never touches a data source or a
 propagator.** Sources produce events, one engine thread turns them into an immutable snapshot, and the GUI
 only reads that snapshot and sends commands back.
 
@@ -20,14 +20,14 @@ only reads that snapshot and sends commands back.
 
 | Crate | Responsibility |
 |---|---|
-| `mctl-core` | The vocabulary shared by everything: UTC time and earth-orientation data, states, configuration, the `World` snapshot and its bus, the source arbiter, caution-and-warning rules, commands, plans. No UI, no network, no async runtime, so it is unit-testable alone. |
-| `mctl-astro` | Pure astrodynamics: SGP4 from OMM, NASA OEM interpolation, TEME/GCRF/ITRF and the local frames (RTN, VNB, LVLH), Sun and Moon, osculating elements, orbit events by root finding, observer geometry and pass prediction, the Sun-Earth L2 frame, Horizons parsing, and the numerical propagator (DOP853 with J2-J4, third bodies, drag and radiation pressure). |
-| `mctl-sources` | Everything that talks to the outside: the on-disk HTTP cache with ETag revalidation, supervised fetch threads with backoff and jitter, the Lightstreamer client for ISSLIVE, STScI schedule parsers, sky-survey pictures, GeoClue and IP location. |
-| `mctl-sim` | The engine thread and its workers (pass prediction, trends from the recording, the maneuver planner, proximity operations), and the simulation clock with its LIVE, SIM and REPLAY modes. |
-| `mctl-store` | The SQLite recording of states, telemetry, element sets, events and the C&W log, with retention and CSV export. |
-| `mctl-gui` | The console: a fixed character grid with pixel-drawn widgets over it, every page and sub-page, the themes, the globe pass (GPU), the line art, the window view, and the Raspberry Pi kiosk display. |
-| `mctl-tui` | Placeholder for a future text-mode front end. |
-| `mctl` (root) | The command-line program: argument parsing, wiring, and the `check`, `shot`, `bench`, `export`, `isslive` and `about` subcommands. |
+| `retroradar-core` | The vocabulary shared by everything: UTC time and earth-orientation data, states, configuration, the `World` snapshot and its bus, the source arbiter, caution-and-warning rules, commands, plans. No UI, no network, no async runtime, so it is unit-testable alone. |
+| `retroradar-astro` | Pure astrodynamics: SGP4 from OMM, NASA OEM interpolation, TEME/GCRF/ITRF and the local frames (RTN, VNB, LVLH), Sun and Moon, osculating elements, orbit events by root finding, observer geometry and pass prediction, the Sun-Earth L2 frame, Horizons parsing, and the numerical propagator (DOP853 with J2-J4, third bodies, drag and radiation pressure). |
+| `retroradar-sources` | Everything that talks to the outside: the on-disk HTTP cache with ETag revalidation, supervised fetch threads with backoff and jitter, the Lightstreamer client for ISSLIVE, STScI schedule parsers, sky-survey pictures, GeoClue and IP location. |
+| `retroradar-sim` | The engine thread and its workers (pass prediction, trends from the recording, the maneuver planner, proximity operations), and the simulation clock with its LIVE, SIM and REPLAY modes. |
+| `retroradar-store` | The SQLite recording of states, telemetry, element sets, events and the C&W log, with retention and CSV export. |
+| `retroradar-gui` | The console: a fixed character grid with pixel-drawn widgets over it, every page and sub-page, the themes, the globe pass (GPU), the line art, the window view, and the Raspberry Pi kiosk display. |
+| `retroradar-tui` | Placeholder for a future text-mode front end. |
+| `retroradar` (root) | The command-line program: argument parsing, wiring, and the `check`, `shot`, `bench`, `export`, `isslive` and `about` subcommands. |
 
 ## Data flow and honesty
 

@@ -30,18 +30,18 @@ fn doctor_resolves_portable_paths_without_writing_files() {
     );
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("R01 DOCTOR OK"), "{text}");
-    assert!(
-        text.contains(&root.join("config/config.toml").display().to_string()),
-        "{text}"
-    );
-    assert!(
-        text.contains(&root.join("cache").display().to_string()),
-        "{text}"
-    );
-    assert!(
-        text.contains(&root.join("data").display().to_string()),
-        "{text}"
-    );
+    for (label, expected) in [
+        ("config", root.join("config").join("config.toml")),
+        ("cache", root.join("cache")),
+        ("data", root.join("data")),
+    ] {
+        let prefix = format!("{label}: ");
+        let reported = text
+            .lines()
+            .find_map(|line| line.strip_prefix(&prefix))
+            .unwrap_or_else(|| panic!("missing {label} path in {text}"));
+        assert_eq!(std::path::Path::new(reported), expected, "{text}");
+    }
     assert!(!root.exists(), "doctor must not create directories");
 }
 
@@ -49,7 +49,8 @@ fn doctor_resolves_portable_paths_without_writing_files() {
 fn doctor_rejects_invalid_portable_configuration() {
     let root = root();
     std::fs::create_dir_all(root.join("config")).expect("create fixture");
-    std::fs::write(root.join("config/config.toml"), "not valid TOML [").expect("write fixture");
+    std::fs::write(root.join("config").join("config.toml"), "not valid TOML [")
+        .expect("write fixture");
     let out = Command::new(env!("CARGO_BIN_EXE_retroradar"))
         .args([
             "--data-dir",

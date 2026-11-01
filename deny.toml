@@ -1,5 +1,5 @@
 # cargo-deny configuration: `cargo deny check`. Run in CI (see .github/workflows/ci.yml).
-# mctl is GPL-3.0-or-later; every licence below is compatible with that.
+# retroradar is GPL-3.0-or-later; every licence below is compatible with that.
 
 [graph]
 all-features = true

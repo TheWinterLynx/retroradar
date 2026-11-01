@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Get a Linux machine ready for mctl and, from a source checkout, build and install it.
+# Get a Linux machine ready for retroradar and, from a source checkout, build and install it.
 #
 #   packaging/bootstrap.sh [options]
 #
@@ -8,8 +8,8 @@
 #   --yes                   do not ask before installing packages or Rust
 #   --no-system-packages    never use the system package manager; print what is missing instead
 #   --no-rust               do not install or update Rust
-#   --no-build              get the machine ready, but do not build or install mctl
-#   --prefix DIR            where to install mctl (default ~/.local; passed to install.sh)
+#   --no-build              get the machine ready, but do not build or install retroradar
+#   --prefix DIR            where to install retroradar (default ~/.local; passed to install.sh)
 #
 # In a source checkout it makes sure there is a C compiler, the libraries the window needs at run time, a
 # Vulkan driver and Rust at the minimum version (installing rustup if there is no suitable Rust), then runs
@@ -45,10 +45,10 @@ good() { printf '  %sok%s       %s\n' "$g" "$n" "$*"; }
 bad() { printf '  %smissing%s  %s\n' "$r" "$n" "$*"; }
 old() { printf '  %stoo old%s  %s\n' "$y" "$n" "$*"; }
 
-[ "$(uname -s)" = Linux ] || die "mctl runs on Linux only (this is $(uname -s))"
+[ "$(uname -s)" = Linux ] || die "retroradar runs on Linux only (this is $(uname -s))"
 case "$(uname -m)" in
     x86_64 | aarch64) ;;
-    *) say "note: $(uname -m) is not a platform mctl has been tried on" ;;
+    *) say "note: $(uname -m) is not a platform retroradar has been tried on" ;;
 esac
 
 # Which package manager, and so which package names.
@@ -149,7 +149,7 @@ if [ "$source_tree" = 1 ]; then
 fi
 
 if [ "$check_only" = 1 ]; then
-    if [ "$problems" = 0 ]; then say "Everything mctl needs is here."; exit 0; fi
+    if [ "$problems" = 0 ]; then say "Everything retroradar needs is here."; exit 0; fi
     say "$problems thing(s) missing. Run packaging/bootstrap.sh without --check to install them."
     exit 1
 fi
@@ -220,20 +220,20 @@ if [ "$source_tree" = 1 ] && [ "$rust_state" != ok ] && [ "$use_rust" = 1 ]; the
         [ -n "$rustc_path" ] || die "Rust did not install; see the output above"
         rust_version="$("$rustc_path" --version | awk '{print $2}')"
         [ "$(printf '%s\n%s\n' "$msrv" "$rust_version" | sort -V | head -n1)" = "$msrv" ] \
-            || die "Rust $rust_version is still older than the $msrv mctl needs"
+            || die "Rust $rust_version is still older than the $msrv retroradar needs"
         good "Rust $rust_version"
     fi
 elif [ "$source_tree" = 1 ] && [ "$rust_state" != ok ]; then
     die "Rust $msrv or newer is needed and --no-rust was given"
 fi
 
-[ "$build" = 1 ] || { say "Machine is ready. Build with: cargo build --release --locked -p mctl"; exit 0; }
+[ "$build" = 1 ] || { say "Machine is ready. Build with: cargo build --release --locked -p retroradar"; exit 0; }
 
 # Building from source needs a good deal of memory for the linker.
 if [ "$source_tree" = 1 ] && [ -r /proc/meminfo ]; then
     mem_mb=$(($(awk '/^MemTotal/ {print $2}' /proc/meminfo) / 1024))
     if [ "$mem_mb" -lt 2000 ]; then
-        say "This machine has about ${mem_mb} MB of memory. Building mctl here is very slow and may run out of"
+        say "This machine has about ${mem_mb} MB of memory. Building retroradar here is very slow and may run out of"
         say "memory; a prebuilt release (see the README) or building on another machine is a better idea."
         confirm "Build anyway?"
     fi
@@ -241,7 +241,7 @@ fi
 
 args=()
 [ -z "$prefix" ] || args+=(--prefix "$prefix")
-say "Building and installing mctl$([ "$source_tree" = 1 ] && echo ' (a few minutes the first time)')"
+say "Building and installing retroradar$([ "$source_tree" = 1 ] && echo ' (a few minutes the first time)')"
 if [ "$dry" = 1 ]; then
     printf '  $ %s%s\n' "$here/install.sh" "${args[*]:+ ${args[*]}}"
     exit 0
@@ -250,6 +250,6 @@ fi
 bindir="${prefix:-$HOME/.local}/bin"
 case ":$PATH:" in
     *":$bindir:"*) ;;
-    *) say "Add $bindir to your PATH to run it as plain \`mctl\`." ;;
+    *) say "Add $bindir to your PATH to run it as plain \`retroradar\`." ;;
 esac
-say "Done. Try: mctl check   (fetches each data source once and reports)"
+say "Done. Try: retroradar check   (fetches each data source once and reports)"

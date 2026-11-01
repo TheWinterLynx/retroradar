@@ -1,9 +1,9 @@
-# mctl default configuration, embedded in the binary. A user file at
-# $XDG_CONFIG_HOME/mctl/config.toml overrides any key (tables merge, arrays replace).
+# retroradar default configuration, embedded in the binary. A user file at
+# $XDG_CONFIG_HOME/retroradar/config.toml overrides any key (tables merge, arrays replace).
 # Invalid values fail loudly with the file and reason; there are no silent defaults.
 
 [fetch]
-user_agent = "mctl/0.0 (mission control display; github.com/LiamDroog/mctl)"
+user_agent = "retroradar/0.0 (mission control display; github.com/TheWinterLynx/retroradar)"
 timeout_s = 30
 # Exponential backoff after a failed fetch, with jitter, capped.
 backoff_initial_s = 30
@@ -103,7 +103,7 @@ alt_m = 10.0
 # alt_m = 100.0
 
 [store]
-# Recording to SQLite. path = "" means $XDG_DATA_HOME/mctl/mctl.db.
+# Recording to SQLite. path = "" means $XDG_DATA_HOME/retroradar/retroradar.db.
 enabled = true
 path = ""
 state_hz = 1.0
@@ -192,7 +192,7 @@ horizons = { id = "-211", step_s = 21600, past_days = 50, future_days = 100, sta
 # ---- Caution and warning rules ---------------------------------------------------
 # Every rule says where its limits come from in `basis`. ISS subsystem limits are user-defined and
 # public flight-rule limits are not assumed, so the subsystem rules below are
-# ILLUSTRATIVE starting points, not flight rules. Edit them in ~/.config/mctl/config.toml (a user
+# ILLUSTRATIVE starting points, not flight rules. Edit them in ~/.config/retroradar/config.toml (a user
 # overlay replaces this whole list if it defines any [[rule]]).
 
 [[rule]]

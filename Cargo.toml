@@ -36,7 +36,7 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
-# Fast incremental rebuilds matter more than the last few percent: `mctl-gfx` rebuilds on launch.
+# Fast incremental rebuilds matter more than the last few percent: `retroradar-gfx` rebuilds on launch.
 [profile.release]
 incremental = true
 debug = false
@@ -52,11 +52,11 @@ strip = true
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
-mctl-core = { version = "0.1.1", path = "crates/mctl-core" }
-mctl-gui = { version = "0.1.1", path = "crates/mctl-gui" }
-mctl-store = { path = "crates/mctl-store" }
-mctl-sim = { version = "0.1.1", path = "crates/mctl-sim" }
-mctl-sources = { version = "0.1.1", path = "crates/mctl-sources" }
+retroradar-core = { version = "0.1.1", path = "crates/retroradar-core" }
+retroradar-gui = { version = "0.1.1", path = "crates/retroradar-gui" }
+retroradar-store = { path = "crates/retroradar-store" }
+retroradar-sim = { version = "0.1.1", path = "crates/retroradar-sim" }
+retroradar-sources = { version = "0.1.1", path = "crates/retroradar-sources" }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time", "signal"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

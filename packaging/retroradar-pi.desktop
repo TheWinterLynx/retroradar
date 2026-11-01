@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=retroradar (CRT display)
+GenericName=Mission control display
+Comment=The low-resolution kiosk display for a small CRT
+Exec=retroradar --pi
+Icon=retroradar
+Terminal=false
+Categories=Science;
+Keywords=ISS;Hubble;JWST;kiosk;CRT;

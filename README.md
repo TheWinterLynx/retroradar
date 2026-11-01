@@ -1,8 +1,7 @@
 # RetroRadar
 
-Consola espacial retro para **Windows nativo y Rust**, basada en
-[mctl de Liam Droog](https://github.com/LiamDroog/mctl). Repositorio independiente,
-sin fork. Conserva GPL-3.0-or-later, créditos y licencias de recursos originales.
+Consola espacial retro para **Windows nativo y Rust**.
+Repositorio de TheWinterLynx, distribuido bajo GPL-3.0-or-later.
 
 ## R01: base Windows y primeras ampliaciones
 
@@ -80,7 +79,7 @@ Actions se limita a `cargo fmt --all -- --check`.
 La ruta anterior contiene `config\config.toml`, `cache` y `data\retroradar.db`.
 La aplicación crea una plantilla comentada al arrancar normalmente. `doctor` solo
 lee. Sin `--data-dir`, se usan los directorios de aplicación Windows del usuario,
-que muestra `doctor`. No se migran ni modifican datos existentes de mctl.
+que muestra `doctor`. Los datos se guardan exclusivamente en los directorios de RetroRadar.
 Una ruta explícita `[store].path` sigue teniendo prioridad sobre el destino portátil.
 `portable-data` está excluido de Git. Otras carpetas personales deben quedar fuera
 del checkout para mantener el gate limpio.
@@ -93,7 +92,7 @@ NO DATA; se mantienen los indicadores de estimación, TLE, planes y antigüedad.
 `check` consulta servicios externos y puede fallar por disponibilidad de terceros;
 no forma parte del gate offline. `--offline`, `--replay`, `export`, `shot`, `bench`
 y `isslive` siguen disponibles; consultar `--help` y el
-[manual original](docs/UPSTREAM-README.md) para la funcionalidad heredada.
+[manual de uso](docs/USAGE-v1.0.md).
 
-[Roadmap](docs/ROADMAP.md) · [Procedencia](docs/UPSTREAM.md) ·
-[Arquitectura heredada](docs/architecture.md) · [Contrato de trabajo](AGENTS.md)
+[Roadmap](docs/ROADMAP.md) · [Avisos legales](NOTICE.md) ·
+[Arquitectura](docs/architecture.md) · [Contrato de trabajo](AGENTS.md)

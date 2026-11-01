@@ -19,7 +19,7 @@ change behaviour.
 - Under WSL the window opens through X11 (WSLg's XWayland) when an X display exists, because WSLg's Wayland
   connection was dropped ("Broken pipe") as soon as the window was resized. Setting `WINIT_UNIX_BACKEND`
   overrides this.
-- The window title is `mctl`, not `mctl gfx spike`.
+- The window title is `retroradar`, not `retroradar gfx spike`.
 
 ## [0.1.0] - 2026-10-31
 
@@ -32,6 +32,6 @@ First public release. In the box:
 - Recording to SQLite, export to CSV, and replay of the recording.
 - Four themes with optional CRT effects, and a low-resolution display mode (`--pi`) for a Raspberry Pi driving
   a composite CRT.
-- `mctl about`, with the licence, credits and third-party notices, and matching ABOUT and CREDITS pages.
+- `retroradar about`, with the licence, credits and third-party notices, and matching ABOUT and CREDITS pages.
 - `packaging/bootstrap.sh`: checks a machine for a compiler, libraries, a Vulkan driver and Rust, installs what is
-  missing (apt, dnf, pacman, and rustup), then builds and installs mctl.
+  missing (apt, dnf, pacman, and rustup), then builds and installs retroradar.

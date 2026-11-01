@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a Natural Earth PolyLine shapefile to mctl's compact coastline format.
+"""Convert a Natural Earth PolyLine shapefile to retroradar's compact coastline format.
 
 Format (little endian): u32 line_count, then per line: u32 point_count followed by
 point_count * (f32 lon_deg, f32 lat_deg). Only parts of PolyLine records are kept

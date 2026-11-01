@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Install the mctl display service on a Raspberry Pi: runs `cage -- mctl --pi` on the first screen at boot.
+# Install the retroradar display service on a Raspberry Pi: runs `cage -- retroradar --pi` on the first screen at boot.
 #
-#   sudo packaging/pi/install-display.sh --user pi --bin /home/pi/mctl/bin/mctl [--enable] [--dry-run]
+#   sudo packaging/pi/install-display.sh --user pi --bin /home/pi/retroradar/bin/retroradar [--enable] [--dry-run]
 #
 # --user    the account the display runs as (it needs to be in the video, render and input groups, as the
 #           first user Raspberry Pi OS creates is)
-# --bin     the mctl binary to run (built for aarch64; see docs/pi.md for cross-building)
-# --enable  also start it at every boot (otherwise only install it: `systemctl start mctl-display` to try)
+# --bin     the retroradar binary to run (built for aarch64; see docs/pi.md for cross-building)
+# --enable  also start it at every boot (otherwise only install it: `systeretroradar start retroradar-display` to try)
 # --dry-run print the unit instead of installing it
 #
 # It needs `cage` and `seatd` (apt install cage seatd). For a display-only Pi also boot to the console:
-#   sudo systemctl set-default multi-user.target
+#   sudo systeretroradar set-default multi-user.target
 set -euo pipefail
 
 user="" bin="" enable=0 dry=0
@@ -29,7 +29,7 @@ if [ -z "$user" ] || [ -z "$bin" ]; then
 fi
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-unit="$(sed -e "s|@USER@|$user|g" -e "s|@BIN@|$bin|g" "$here/mctl-display.service.in")"
+unit="$(sed -e "s|@USER@|$user|g" -e "s|@BIN@|$bin|g" "$here/retroradar-display.service.in")"
 
 if [ "$dry" = 1 ]; then
     printf '%s\n' "$unit"
@@ -41,11 +41,11 @@ id "$user" >/dev/null 2>&1 || { echo "install-display.sh: no such user: $user" >
 [ -x "$bin" ] || { echo "install-display.sh: $bin is not an executable file" >&2; exit 1; }
 command -v cage >/dev/null 2>&1 || { echo "install-display.sh: cage is not installed (apt install cage seatd)" >&2; exit 1; }
 
-printf '%s\n' "$unit" > /etc/systemd/system/mctl-display.service
-systemctl daemon-reload
+printf '%s\n' "$unit" > /etc/systemd/system/retroradar-display.service
+systeretroradar daemon-reload
 if [ "$enable" = 1 ]; then
-    systemctl enable mctl-display.service
-    echo "installed and enabled: it starts at the next boot (or: systemctl start mctl-display)"
+    systeretroradar enable retroradar-display.service
+    echo "installed and enabled: it starts at the next boot (or: systeretroradar start retroradar-display)"
 else
-    echo "installed: systemctl start mctl-display to try it, or re-run with --enable"
+    echo "installed: systeretroradar start retroradar-display to try it, or re-run with --enable"
 fi

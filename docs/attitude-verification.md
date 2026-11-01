@@ -1,6 +1,6 @@
 # ISSLIVE: attitude convention and unit corrections (the design document R4)
 
-Checked 2026-10-23 against the live feed (`mctl isslive`, 20 s capture), not against documentation.
+Checked 2026-10-23 against the live feed (`retroradar isslive`, 20 s capture), not against documentation.
 
 **Quaternion convention.** Reading USLAB000028-31 (the *commanded* attitude) as scalar-first, aerospace
 3-2-1 (roll, pitch, yaw) gives roll 0.9000, pitch -7.8000, yaw -4.0000 degrees to better than 1e-6 of a

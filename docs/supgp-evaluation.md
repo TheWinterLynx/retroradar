@@ -1,6 +1,6 @@
 # CelesTrak supplemental GP (ISS-E): M1 evaluation (the design document §3.1)
 
-Checked 2026-10-23 with `cargo test -p mctl-astro supgp_vs_oem -- --ignored --nocapture` against the cached
+Checked 2026-10-23 with `cargo test -p retroradar-astro supgp_vs_oem -- --ignored --nocapture` against the cached
 NASA OEM (created 2026-10-21 16:27).
 
 Each ISS-E segment is a fit forward from its own epoch, so the segment answering a query is the latest one whose
