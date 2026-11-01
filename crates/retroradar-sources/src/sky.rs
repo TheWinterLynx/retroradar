@@ -446,7 +446,8 @@ mod tests {
     }
 
     fn serve(replies: Vec<(u16, Vec<u8>)>) -> (String, std::thread::JoinHandle<()>) {
-        use std::io::{BufRead, BufReader, Write};
+        use std::io::{BufRead, BufReader, Read, Write};
+        use std::net::Shutdown;
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let url = format!("http://{}/image", listener.local_addr().unwrap());
@@ -466,24 +467,107 @@ mod tests {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .unwrap();
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                loop {
-                    let mut line = String::new();
-                    assert!(reader.read_line(&mut line).unwrap() > 0);
-                    if line == "\r\n" {
-                        break;
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                // Borrow one socket instead of keeping a cloned descriptor alive
+                // while the other handle is closed on Windows.
+                {
+                    let mut reader = BufReader::new(&mut stream);
+                    loop {
+                        let mut line = String::new();
+                        assert!(reader.read_line(&mut line).unwrap() > 0);
+                        if line == "\r\n" {
+                            break;
+                        }
                     }
                 }
-                write!(
-                    stream,
+                let mut response = format!(
                     "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                     body.len()
                 )
-                .unwrap();
-                stream.write_all(&body).unwrap();
+                .into_bytes();
+                response.extend_from_slice(&body);
+                stream.write_all(&response).unwrap();
+                // Send FIN only after the whole reply, then wait for the peer's
+                // close before dropping the socket. A bare close can race with
+                // the client's body read and produce WSAECONNRESET (10054).
+                let peer_closed = |e: &std::io::Error| {
+                    matches!(
+                        e.kind(),
+                        std::io::ErrorKind::ConnectionReset
+                            | std::io::ErrorKind::ConnectionAborted
+                            | std::io::ErrorKind::NotConnected
+                    )
+                };
+                match stream.shutdown(Shutdown::Write) {
+                    Ok(()) => {}
+                    Err(e) if peer_closed(&e) => continue,
+                    Err(e) => panic!("mock HTTP send shutdown: {e}"),
+                }
+                let mut extra = [0u8; 1];
+                match stream.read(&mut extra) {
+                    Ok(0) => {}
+                    // The client may cancel an HTTP error response without
+                    // reading its body; its reset is not a server teardown bug.
+                    Err(e) if peer_closed(&e) => {}
+                    other => panic!("mock HTTP expected peer close after GET: {other:?}"),
+                }
             }
         });
         (url, worker)
+    }
+
+    #[test]
+    fn mock_http_delivers_complete_replies_then_clean_eof() {
+        use std::io::{Read, Write};
+        use std::net::{Shutdown, TcpStream};
+        let replies = vec![
+            (200, b"ready".to_vec()),
+            (200, vec![0x5a; 256 * 1024]),
+            (503, b"unavailable".to_vec()),
+            (200, vec![]),
+        ];
+        let (url, server) = serve(replies.clone());
+        let address = url
+            .strip_prefix("http://")
+            .unwrap()
+            .strip_suffix("/image")
+            .unwrap();
+        for (i, (status, body)) in replies.iter().enumerate() {
+            let mut stream = TcpStream::connect(address).unwrap();
+            stream.set_nodelay(true).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            // Exercise request headers arriving in several writes, and peers
+            // closing their send side either before or after reading the reply.
+            for part in [
+                "GET /image HTTP/1.1\r\n",
+                "Host: localhost\r\n",
+                "Connection: close\r\n",
+                "\r\n",
+            ] {
+                stream.write_all(part.as_bytes()).unwrap();
+            }
+            if i % 2 == 0 {
+                stream.shutdown(Shutdown::Write).unwrap();
+            }
+            let mut reply = Vec::new();
+            // read_to_end must observe a clean FIN, not a connection reset.
+            stream.read_to_end(&mut reply).unwrap();
+            let mut expected = format!(
+                "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .into_bytes();
+            expected.extend_from_slice(body);
+            assert_eq!(reply, expected);
+        }
+        server.join().unwrap();
     }
 
     #[test]

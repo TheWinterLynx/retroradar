@@ -58,3 +58,32 @@ ephemeris during a read-only probe. Both documented CDS cutout routes returned
 HTTP 503 with upstream-connect timeout text in this environment. These probes
 characterize that route/time, not all users' connectivity. Windows runtime and
 real-source recovery remain owner acceptance checks.
+
+## Windows loopback fixture close
+
+The R01 Windows gate reported Winsock 10054 while reading the local fixture's
+`ready` response in
+`endpoint_failures_pause_other_targets_and_can_retry_after_the_pause`.
+This test uses 127.0.0.1 and does not query CDS or JPL.
+
+The mock server previously wrote response headers and body separately and dropped
+cloned socket handles immediately afterward. It now owns a single socket, borrows
+it while reading request headers, writes the complete response, shuts down its
+send direction and waits for the peer close before dropping it. Both read/write
+operations are bounded by timeouts. A peer may cancel a non-success response;
+client-side response and cooldown assertions remain strict.
+
+A new regression checks fragmented request headers, small/large/empty replies,
+HTTP 200 and 503, early peer half-close and a peer waiting for the response EOF.
+Every response must arrive intact followed by clean EOF. Existing cooldown tests
+still require the second target to be paused and the third to receive `ready`.
+
+All changes are under `cfg(test)`; production source fetching, retry policies,
+URLs, cache and TLS behaviour are unchanged. The existing `Sky service recovery`
+gate step automatically runs the new case. Windows acceptance remains pending
+the owner's rerun.
+
+Loopback-fix validation on Linux / Rust 1.95.0: all 12 sky tests passed in 20
+consecutive runs (240 checks); the workspace passed with `-Dwarnings` (354
+passed, 0 failed, 8 ignored). Formatting passed and Cargo.lock is unchanged.
+This does not claim reproduction or acceptance on Windows.

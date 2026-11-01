@@ -8,6 +8,9 @@ change behaviour.
 
 ### Fixed
 
+- The sky-service loopback test server sends complete HTTP replies and performs
+  a bounded graceful TCP close, avoiding premature response teardown on Windows.
+
 - Mouse drag and arrows slow down when zooming toward Earth or the vehicle;
   fixed-FOV VIEW free-look and programmed kiosk drift retain their own rates.
 - Magnified coastline annotations fade in close views instead of expanding
