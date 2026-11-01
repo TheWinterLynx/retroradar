@@ -1,6 +1,6 @@
 # Embedded asset licenses
 
-Every asset embedded in the `mctl` binary, with its source and licence. The project itself is
+Every asset embedded in the `retroradar` binary, with its source and licence. The project itself is
 GPL-3.0-or-later; none of the licences below conflict with that. Verified 2026-10-23.
 
 | Asset | File | Source | Licence | Embeddable in a distributed binary? |
@@ -26,4 +26,4 @@ GPL-3.0-or-later; none of the licences below conflict with that. Verified 2026-1
 
 ## Dependency fonts
 
-egui's `default-fonts` feature embeds additional fonts (Ubuntu-Light, Hack, NotoEmoji, emoji-icon-font) with their own licences. mctl builds egui **without** that feature, so only the fonts above are in the binary.
+egui's `default-fonts` feature embeds additional fonts (Ubuntu-Light, Hack, NotoEmoji, emoji-icon-font) with their own licences. RetroRadar builds egui **without** that feature, so only the fonts above are in the binary.
