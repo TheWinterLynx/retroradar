@@ -930,14 +930,21 @@ impl Console {
                     page::paint_eclipse_ring(&painter, &theme, px, v, now);
                 }
             }
+            // The 3D pass has its own scissor; its 2D overlays need the same
+            // panel boundary or off-axis Sun markers and labels reach other panels.
+            let [gx, gy, gw, gh] = globe_px;
+            let globe_painter = painter.with_clip_rect(egui::Rect::from_min_size(
+                Pos2::new(gx as f32, gy as f32),
+                egui::vec2(gw as f32, gh as f32),
+            ));
             if let (Some(sc), Some(sol), Some(_), true) =
                 (scene.as_ref(), sol, window_look, has_area)
             {
-                crate::window::paint(&painter, &theme, globe_px, sc, sol, moon);
+                crate::window::paint(&globe_painter, &theme, globe_px, sc, sol, moon);
             } else if let (Some(sc), true) = (scene.as_ref(), has_area) {
                 if let (Some(track), Some(sol)) = (vehicle.and_then(|v| v.track.as_ref()), sol) {
                     crate::overlays::paint(
-                        &painter,
+                        &globe_painter,
                         &theme,
                         globe_px,
                         sc,
@@ -949,7 +956,7 @@ impl Console {
                         vehicle.and_then(|v| world.plans.iter().find(|(id, _)| *id == v.id))
                     {
                         crate::overlays::paint_plan(
-                            &painter,
+                            &globe_painter,
                             &theme,
                             globe_px,
                             sc,
@@ -972,7 +979,7 @@ impl Console {
                     } else {
                         name.to_owned()
                     };
-                    painter.text(
+                    globe_painter.text(
                         at,
                         egui::Align2::LEFT_BOTTOM,
                         text,
@@ -1303,6 +1310,115 @@ mod tests {
         assert!(rx.try_recv().is_err(), "a is free now");
         press(&mut c, &w, "K");
         assert_eq!(rx.try_recv(), Ok(Command::Ack));
+    }
+
+    #[test]
+    fn sun_at_the_globe_edge_keeps_its_draw_commands_clipped_to_the_panel() {
+        use glam::Vec3;
+        use retroradar_core::state::{Elements, Geodetic, Quality, SourceKind, State};
+        use retroradar_core::world::{Solution, Track};
+
+        let (mut c, _rx) = console();
+        let mut w = crate::kiosk::test_world(1);
+        let v = &mut w.vehicles[0];
+        v.id = "iss".into();
+        v.solution = Some(Solution {
+            source: SourceKind::Gp,
+            quality: Quality::Pred,
+            state_gcrf: State::new([6778.0, 0.0, 0.0], [0.0, 7.6, 0.0]),
+            state_itrf: State::new([6778.0, 0.0, 0.0], [0.0; 3]),
+            geodetic: Geodetic {
+                lat_deg: 0.0,
+                lon_deg: 0.0,
+                alt_km: 400.0,
+            },
+            elements: Elements {
+                sma_km: 6778.0,
+                ecc: 0.0,
+                inc_deg: 51.6,
+                raan_deg: 0.0,
+                argp_deg: 0.0,
+                true_anom_deg: 0.0,
+                mean_anom_deg: 0.0,
+                period_s: 5560.0,
+                apo_alt_km: 400.0,
+                peri_alt_km: 400.0,
+            },
+            sun_gcrf_km: [1.5e8, 0.0, 0.0],
+            beta_deg: 0.0,
+            illumination: 1.0,
+            gmst_rad: 0.0,
+            ecef_from_gcrf: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        });
+        v.track = Some(std::sync::Arc::new(Track {
+            revision: 1,
+            source: SourceKind::Gp,
+            points: vec![],
+            now_index: 0,
+            events: vec![],
+        }));
+        let size = [1920, 1080];
+        let stats = FrameStats {
+            elapsed_s: 0.0,
+            frame_ms: 16.0,
+            gpu_ms: None,
+        };
+        let mut first = c.prepare(headless_input(size, 0.0), size, &w, &stats);
+        first.textures_delta.clear();
+        let scene = first.scene.expect("a globe scene");
+        let rect_px = first.globe_rect_px.expect("a globe panel");
+        let [x, y, width, height] = rect_px;
+        let panel = egui::Rect::from_min_size(
+            Pos2::new(x as f32, y as f32),
+            egui::vec2(width as f32, height as f32),
+        );
+        // Place the Sun just inside the right edge so its disc crosses the border
+        // and the SUN label falls in the neighbouring panel before clipping.
+        let (direction, sun_px) = (0..7200)
+            .find_map(|step| {
+                let angle = (step as f32 * 0.05).to_radians();
+                let direction = Vec3::new(angle.cos(), angle.sin(), 0.0);
+                let px = crate::overlays::project(&scene, rect_px, direction * 2.6)?;
+                (px.x > panel.right() - 5.0
+                    && px.x < panel.right() - 1.0
+                    && px.y > panel.top() + 20.0
+                    && px.y < panel.bottom() - 20.0)
+                    .then_some((direction, px))
+            })
+            .expect("a Sun direction near the panel edge");
+        w.vehicles[0].solution.as_mut().unwrap().sun_gcrf_km =
+            direction.as_dvec3().to_array().map(|n| n * 1.5e8);
+        let mut prepared = c.prepare(headless_input(size, 0.1), size, &w, &stats);
+        prepared.textures_delta.clear();
+        let caution = c.theme().palette.caution.to_egui();
+        let mut sun_jobs = 0;
+        for job in &prepared.jobs {
+            if let egui::epaint::Primitive::Mesh(mesh) = &job.primitive {
+                if mesh
+                    .vertices
+                    .iter()
+                    .any(|v| v.color == caution && v.pos.distance(sun_px) < 10.0)
+                {
+                    // Other console text can share this colour and position;
+                    // identify the Sun geometry submitted with the panel clip.
+                    if !panel.contains_rect(job.clip_rect) {
+                        continue;
+                    }
+                    sun_jobs += 1;
+                }
+            }
+        }
+        assert!(
+            sun_jobs > 0,
+            "the visible part of the Sun must still be drawn"
+        );
+        assert!(
+            prepared
+                .jobs
+                .iter()
+                .any(|job| job.clip_rect.width() > panel.width()),
+            "the rest of the console must keep its wider clip rectangle"
+        );
     }
 
     #[test]
