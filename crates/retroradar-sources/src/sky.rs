@@ -445,6 +445,45 @@ mod tests {
         })
     }
 
+    fn blocking_fixture_stream(stream: std::net::TcpStream) -> std::net::TcpStream {
+        // Winsock can inherit the listener's nonblocking mode on accept.
+        // Read/write timeouts do not switch a nonblocking socket to blocking.
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        stream
+    }
+
+    #[test]
+    fn accepted_nonblocking_socket_is_normalized_before_timed_reads() {
+        use std::io::Read;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let _client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (stream, _) = listener.accept().unwrap();
+        // Force the Windows accept behaviour on every host, including Linux.
+        stream.set_nonblocking(true).unwrap();
+        let mut stream = blocking_fixture_stream(stream);
+        stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        let started = Instant::now();
+        let error = stream.read(&mut [0u8; 1]).unwrap_err();
+        assert!(matches!(
+            error.kind(),
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+        ));
+        // A nonblocking read would fail immediately instead of waiting for the
+        // configured timeout. No request bytes are sent by the connected peer.
+        assert!(
+            started.elapsed() >= Duration::from_millis(50),
+            "read returned immediately: {error}"
+        );
+    }
+
     fn serve(replies: Vec<(u16, Vec<u8>)>) -> (String, std::thread::JoinHandle<()>) {
         use std::io::{BufRead, BufReader, Read, Write};
         use std::net::Shutdown;
@@ -454,7 +493,7 @@ mod tests {
         let worker = std::thread::spawn(move || {
             for (status, body) in replies {
                 let deadline = Instant::now() + Duration::from_secs(5);
-                let mut stream = loop {
+                let stream = loop {
                     match listener.accept() {
                         Ok((stream, _)) => break stream,
                         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -464,12 +503,7 @@ mod tests {
                         Err(e) => panic!("mock HTTP accept: {e}"),
                     }
                 };
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(2)))
-                    .unwrap();
-                stream
-                    .set_write_timeout(Some(Duration::from_secs(2)))
-                    .unwrap();
+                let mut stream = blocking_fixture_stream(stream);
                 // Borrow one socket instead of keeping a cloned descriptor alive
                 // while the other handle is closed on Windows.
                 {

@@ -66,14 +66,18 @@ The R01 Windows gate reported Winsock 10054 while reading the local fixture's
 `endpoint_failures_pause_other_targets_and_can_retry_after_the_pause`.
 This test uses 127.0.0.1 and does not query CDS or JPL.
 
-The mock server previously wrote response headers and body separately and dropped
-cloned socket handles immediately afterward. It now owns a single socket, borrows
-it while reading request headers, writes the complete response, shuts down its
-send direction and waits for the peer close before dropping it. Both read/write
+The first teardown-only fix passed Linux tests but still failed on Windows:
+accepted sockets inherited nonblocking mode from the listener, producing Winsock
+10035 during header reads and close handling. Timeouts do not restore blocking
+mode. The server now explicitly calls `set_nonblocking(false)` immediately after
+accepting each connection, before setting timeouts or reading/writing. It owns a
+single socket, borrows it while reading request headers, writes the complete
+response, shuts down its send direction and waits for the peer close before
+dropping it. Both read/write
 operations are bounded by timeouts. A peer may cancel a non-success response;
 client-side response and cooldown assertions remain strict.
 
-A new regression checks fragmented request headers, small/large/empty replies,
+Regression coverage checks fragmented request headers, small/large/empty replies,
 HTTP 200 and 503, early peer half-close and a peer waiting for the response EOF.
 Every response must arrive intact followed by clean EOF. Existing cooldown tests
 still require the second target to be paused and the third to receive `ready`.
@@ -87,3 +91,17 @@ Loopback-fix validation on Linux / Rust 1.95.0: all 12 sky tests passed in 20
 consecutive runs (240 checks); the workspace passed with `-Dwarnings` (354
 passed, 0 failed, 8 ignored). Formatting passed and Cargo.lock is unchanged.
 This does not claim reproduction or acceptance on Windows.
+
+A socket-mode regression explicitly puts an accepted connection in nonblocking
+mode on every platform, invokes the same fixture configuration and verifies that
+an empty read waits for the configured timeout rather than failing immediately.
+An intentional negative control (keeping nonblocking mode) fails this regression
+on Linux; restoring blocking mode passes. This covers the platform difference
+that the previous Linux-only runs missed.
+
+Reference: [Microsoft Winsock accept properties](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-accept).
+
+Socket-mode-fix validation on Linux / Rust 1.95.0: 20 consecutive runs of all
+13 sky tests passed (260 checks), including the forced-nonblocking regression.
+The workspace passed with `-Dwarnings`: 355 passed, 0 failed, 8 ignored.
+Formatting passed and Cargo.lock is unchanged. Windows acceptance is pending.

@@ -8,8 +8,9 @@ change behaviour.
 
 ### Fixed
 
-- The sky-service loopback test server sends complete HTTP replies and performs
-  a bounded graceful TCP close, avoiding premature response teardown on Windows.
+- The sky-service loopback server explicitly restores blocking mode on accepted
+  sockets before timed reads/writes, covering Winsock listener-mode inheritance.
+  Replies are sent in full and connections use a bounded graceful TCP close.
 
 - Mouse drag and arrows slow down when zooming toward Earth or the vehicle;
   fixed-FOV VIEW free-look and programmed kiosk drift retain their own rates.
