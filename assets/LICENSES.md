@@ -13,6 +13,17 @@ GPL-3.0-or-later; none of the licences below conflict with that. HD Earth assets
 | Black Marble 2012, downsampled from 13500×6750 to 4096×2048 and 8192×4096 | `earth/black_marble_4096x2048.jpg`, `earth/black_marble_8192x4096.jpg` | [NASA maps](https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/). Credit: NASA Earth Observatory / NOAA NGDC (Suomi NPP VIIRS). Exact source URL and checksums: `earth/hd-textures-v1.0.json`. | NASA Media Usage Guidelines, as above. | Yes, with the same caveats. Resampled/compressed; no generated detail. |
 | Natural Earth 110m and 50m coastline v4.1.0 (shapefiles converted to `.bin` by `tools/shp_to_coast.py`) | `coastlines/ne_110m_coastline.bin`, `coastlines/ne_50m_coastline.bin` | https://naciscdn.org/naturalearth/110m/physical/ne_110m_coastline.zip and `.../50m/physical/ne_50m_coastline.zip`; terms: https://www.naturalearthdata.com/about/terms-of-use/ | Public domain: "You may use the maps in any manner, including modifying the content and design, electronic dissemination, and offset printing ... No permission is needed to use Natural Earth. Crediting the authors is unnecessary." | Yes. |
 
+## Downloaded regional imagery and test fixture
+
+EOX Sentinel-2 cloudless 2016 (`s2cloudless`, WGS84) is downloaded only on demand,
+not embedded in the production binary. Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Attribution: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH
+(Contains modified Copernicus Sentinel data 2016). Mapping/filtering on the globe
+is an adaptation. The attribution and licence link are shown over regional views.
+Exact service/matrix and fixture provenance: `earth/regional-source-v1.0.json`.
+The small Madrid tile in `crates/retroradar-gui/fixtures/earth` is used only in tests
+under that same licence; its adjacent JSON records its URL and SHA-256.
+
 ## Rejected
 
 - **VT323** (OFL 1.1): licence is fine, but the font has **no box-drawing or block glyphs** (0 of 128 + 0 of 32 checked with fontTools), so it can't draw panel borders.

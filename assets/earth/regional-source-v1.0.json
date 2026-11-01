@@ -1,0 +1,25 @@
+{
+  "provider": "EOX IT Services GmbH",
+  "layer": "s2cloudless",
+  "release": "2016",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "capabilities_url": "https://tiles.maps.eox.at/wmts/1.0.0/WMTSCapabilities.xml",
+  "capabilities_sha256": "5f7f37b51f4bd53a2ec309d21a3fe94ef889d4af1b6b707d98cd6bf1940f5f34",
+  "https_template": "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless/default/WGS84/{z}/{row}/{col}.jpg",
+  "matrix": "WGS84",
+  "crs": "EPSG:4326",
+  "tile_size": [
+    256,
+    256
+  ],
+  "matrix_columns": "2^(z+1)",
+  "matrix_rows": "2^z",
+  "max_native_level": 13,
+  "approx_equatorial_metres_per_texel_at_max_level": 9.55,
+  "fixture": {
+    "file": "crates/retroradar-gui/fixtures/earth/s2-2016-z13-y2257-x8023.jpg",
+    "url": "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless/default/WGS84/13/2257/8023.jpg",
+    "sha256": "32d25007f6eb7f7716f0ade31eecaa707dfad6fbc64049eaa7f6f56500a846f6"
+  }
+}

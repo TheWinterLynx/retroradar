@@ -68,10 +68,14 @@ views inevitably magnify that finite detail.
 
 Manual drag and arrows use zoom-sensitive angular steps for both focus modes.
 Earth sensitivity follows surface clearance, vehicle sensitivity follows distance
-to the vehicle, capped at the normal overview speed. Fixed-FOV VIEW free-look,
-programmed kiosk drift and physical orbital motion retain their existing rates.
+to the vehicle, capped at the normal overview speed. VIEW free-look follows its optical zoom. Programmed kiosk drift and physical
+orbital motion retain their existing rates.
 
 The graphical gate renders a fixed test orbit over the Aegean, changes the coast
 colour and compares pixels: the overlay must remain visible in overview and fade
 in NADIR. Test screenshots are kept under `target/earth-close-v1.0`; they use a
 test-only orbit, never a live feed.
+
+Regional follow-up: the desktop now adds on-demand EOX Sentinel-2 2016 imagery
+and extends globe/VIEW zoom. Global texture tiers above remain the fallback.
+See `R01-REGIONAL-EARTH-v1.0.md` for coverage, cache and offline acceptance.

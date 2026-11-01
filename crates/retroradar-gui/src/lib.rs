@@ -1,7 +1,7 @@
 //! winit + wgpu + egui front end: character-grid console, GPU panels, CRT post-processing, themes.
 //!
 //! The GUI is a pure consumer of the engine's published `World` snapshot: it never
-//! calls into sources or propagators.
+//! propagates or fetches orbital sources. Regional imagery uses a bounded background worker.
 
 mod about;
 mod adi;
@@ -29,6 +29,7 @@ mod render;
 mod screens;
 mod sky;
 mod telemetry_view;
+mod terrain;
 mod theme;
 mod trendplot;
 mod vehicle_pages;

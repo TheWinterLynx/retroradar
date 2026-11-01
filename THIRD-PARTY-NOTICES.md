@@ -9229,6 +9229,12 @@ the following restrictions:
 | Font: Unscii-16 | http://viznut.fi/unscii/ | Public domain, per its author |
 | Font: JetBrains Mono | https://github.com/JetBrains/JetBrainsMono | SIL Open Font License 1.1 (below) |
 
+Regional imagery downloaded on demand: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH
+(Contains modified Copernicus Sentinel data 2016), CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/. Mapping/filtering is an adaptation.
+The same licence applies to the offline Madrid test tile; exact source URLs and
+checksums are in assets/earth/regional-source-v1.0.json.
+
 The Earth day imagery includes 4096×2048, 8192×4096 and 16384×8192 versions;
 night imagery includes 2048×1024, 4096×2048 and 8192×4096 versions. Higher
 resolutions were downsampled from NASA originals, without generated detail.

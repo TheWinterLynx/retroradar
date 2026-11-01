@@ -23,7 +23,7 @@ const DEFAULT_AZIMUTH_DEG: f32 = 35.0;
 const DEFAULT_ELEVATION_DEG: f32 = 24.0;
 const DEFAULT_DISTANCE_EARTH_RE: f32 = 3.6;
 const DEFAULT_DISTANCE_VEHICLE_RE: f32 = 0.35;
-const DISTANCE_LIMITS_EARTH_RE: (f32, f32) = (1.25, 14.0);
+const DISTANCE_LIMITS_EARTH_RE: (f32, f32) = (1.0 + 10.0 / EARTH_RADIUS_KM, 14.0);
 const DISTANCE_LIMITS_VEHICLE_RE: (f32, f32) = (0.02, 3.0);
 const ELEVATION_LIMIT_DEG: f32 = 89.0;
 const CAMERA_FOV_DEG: f32 = 32.0;
@@ -56,6 +56,7 @@ pub struct Camera {
     /// Camera rides with the Earth instead of staying fixed in the inertial frame.
     pub earth_fixed: bool,
     pub focus_vehicle: bool,
+    pub window_fov_deg: f32,
     pub exaggeration_idx: usize,
 }
 
@@ -68,6 +69,7 @@ impl Default for Camera {
             dist_vehicle_re: DEFAULT_DISTANCE_VEHICLE_RE,
             earth_fixed: false,
             focus_vehicle: false,
+            window_fov_deg: 75.0,
             exaggeration_idx: 0,
         }
     }
@@ -93,8 +95,18 @@ impl Camera {
         } else {
             (self.dist_earth_re - 1.0) / (DEFAULT_DISTANCE_EARTH_RE - 1.0)
         }
-        .clamp(0.02, 1.0);
+        .clamp(0.0001, 1.0);
         self.orbit_by(d_az_deg * scale, d_el_deg * scale);
+    }
+
+    /// Pixel-relative drag stays usable on both 1080p and 4K panels.
+    pub fn drag_by_pixels(&mut self, dx: f32, dy: f32, height: f32) {
+        let base = 2.0
+            * (CAMERA_FOV_DEG.to_radians() * 0.5).tan()
+            * (DEFAULT_DISTANCE_EARTH_RE - 1.0)
+            * (180.0 / std::f32::consts::PI)
+            / height.max(1.0);
+        self.orbit_input_by(-dx * base, dy * base);
     }
 
     /// Multiply the distance of the active focus by `factor` (clamped).
@@ -180,7 +192,11 @@ pub fn build_scene(camera: &Camera, sol: &Solution, aspect: f32) -> GlobeScene {
     let (target, dist, near) = if camera.focus_vehicle {
         (vehicle, camera.dist_vehicle_re, NEAR_VEHICLE_RE)
     } else {
-        (Vec3::ZERO, camera.dist_earth_re, NEAR_EARTH_RE)
+        (
+            Vec3::ZERO,
+            camera.dist_earth_re,
+            ((camera.dist_earth_re - 1.0) * 0.05).clamp(0.000005, NEAR_EARTH_RE),
+        )
     };
     let cam_pos = target + dir * dist;
     let view = glam::camera::rh::view::look_at_mat4(cam_pos, target, Vec3::Z);
@@ -242,6 +258,7 @@ struct Uniforms {
     viewport: [f32; 4],
     shade: [f32; 4],
     orbit_dash: [f32; 4],
+    detail_bounds: [f32; 4],
 }
 
 fn rgba(c: crate::theme::Rgb, a: f32) -> [f32; 4] {
@@ -367,6 +384,8 @@ pub struct GlobePass {
     orbit_key: Option<u64>,
     draw_marker: bool,
     texture_plan: crate::earth::TexturePlan,
+    detail_texture: wgpu::Texture,
+    detail_bounds: [f32; 4],
 }
 
 impl GlobePass {
@@ -450,6 +469,21 @@ impl GlobePass {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let detail_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("earth-regional-detail"),
+            size: wgpu::Extent3d {
+                width: crate::terrain::PATCH_SIZE,
+                height: crate::terrain::PATCH_SIZE,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let detail_view = detail_texture.create_view(&Default::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("globe-sampler"),
             address_mode_u: wgpu::AddressMode::Repeat,
@@ -498,6 +532,7 @@ impl GlobePass {
                 tex_entry(2),
                 tex_entry(3),
                 tex_entry(5),
+                tex_entry(6),
                 wgpu::BindGroupLayoutEntry {
                     binding: 4,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -525,6 +560,10 @@ impl GlobePass {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::TextureView(&mask_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&detail_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 5,
@@ -612,7 +651,38 @@ impl GlobePass {
             orbit_key: None,
             draw_marker: false,
             texture_plan,
+            detail_texture,
+            detail_bounds: [0.0; 4],
         })
+    }
+
+    pub(crate) fn upload_detail(
+        &mut self,
+        queue: &wgpu::Queue,
+        image: &image::RgbaImage,
+        bounds: [f32; 4],
+    ) {
+        if image.dimensions() != (crate::terrain::PATCH_SIZE, crate::terrain::PATCH_SIZE) {
+            return;
+        }
+        queue.write_texture(
+            self.detail_texture.as_image_copy(),
+            image.as_raw(),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(image.width() * 4),
+                rows_per_image: Some(image.height()),
+            },
+            wgpu::Extent3d {
+                width: image.width(),
+                height: image.height(),
+                depth_or_array_layers: 1,
+            },
+        );
+        self.detail_bounds = bounds;
+    }
+    pub(crate) fn clear_detail(&mut self) {
+        self.detail_bounds = [0.0; 4];
     }
 
     pub fn texture_summary(&self) -> String {
@@ -679,6 +749,7 @@ impl GlobePass {
                 MARKER_SIZE_PX,
             ],
             orbit_dash: [ORBIT_DASHES, ORBIT_DASH_DUTY, 0.0, 0.0],
+            detail_bounds: self.detail_bounds,
         };
         queue.write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&u));
         self.draw_marker = true;
@@ -865,6 +936,35 @@ mod tests {
             camera.orbit_by(5.0, 0.0);
             assert!((camera.azimuth_deg - before - 5.0).abs() < 1e-4);
         }
+    }
+
+    #[test]
+    fn close_camera_reaches_ten_km_with_finite_projection_and_native_tile_request() {
+        let mut camera = Camera::default();
+        camera.zoom_by(0.0001);
+        let altitude = (camera.dist_earth_re - 1.0) * EARTH_RADIUS_KM;
+        assert!((altitude - 10.0).abs() < 0.01);
+        let scene = build_scene(&camera, &solution([7000.0, 0.0, 0.0]), 1.7);
+        assert!(scene.view_proj.is_finite() && scene.view_proj.inverse().is_finite());
+        let tile = crate::terrain::request(&scene).expect("close ground needs regional detail");
+        assert!(tile.level >= 12);
+        let far = build_scene(&Camera::default(), &solution([7000.0, 0.0, 0.0]), 1.7);
+        assert!(crate::terrain::request(&far).is_none());
+    }
+
+    #[test]
+    fn drag_uses_viewport_pixels_and_retains_close_zoom_precision() {
+        let mut a = Camera::default();
+        let mut b = a;
+        a.drag_by_pixels(100.0, 40.0, 720.0);
+        b.drag_by_pixels(200.0, 80.0, 1440.0);
+        assert!((a.azimuth_deg - b.azimuth_deg).abs() < 1e-4);
+        assert!((a.elevation_deg - b.elevation_deg).abs() < 1e-4);
+        let mut close = Camera::default();
+        close.zoom_by(0.0001);
+        let before = close.azimuth_deg;
+        close.drag_by_pixels(100.0, 0.0, 1440.0);
+        assert!((before - close.azimuth_deg) > 0.0 && (before - close.azimuth_deg) < 0.01);
     }
 
     #[test]

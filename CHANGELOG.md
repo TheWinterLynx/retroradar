@@ -13,11 +13,15 @@ change behaviour.
   Replies are sent in full and connections use a bounded graceful TCP close.
 
 - Mouse drag and arrows slow down when zooming toward Earth or the vehicle;
-  fixed-FOV VIEW free-look and programmed kiosk drift retain their own rates.
+  VIEW free-look follows its optical zoom; programmed kiosk drift retains its rate.
 - Magnified coastline annotations fade in close views instead of expanding
   into broad stair-stepped outlines. The underlying imagery is unchanged.
 
 ### Added
+
+- Progressive EOX Sentinel-2 2016 regional imagery (CC BY 4.0), up to roughly
+  10 m per pixel, with worker loading, bounded cache and offline fallback.
+- Globe camera down to 10 km, VIEW optical zoom up to 100× and matching controls.
 
 - Real 16K day / 8K night Earth imagery, with low/medium/high/auto startup quality,
   GPU dimension fallback, effective resolution reporting and an explicit HD local gate.

@@ -13,7 +13,12 @@ use crate::overlays::project;
 use crate::theme::Theme;
 
 /// Vertical field of view of the window, degrees: wide enough to see the curve of the limb.
-const FOV_DEG: f32 = 75.0;
+pub const DEFAULT_FOV_DEG: f32 = 75.0;
+pub const MIN_FOV_DEG: f32 = 0.879_24;
+
+pub fn magnification(fov_deg: f32) -> f32 {
+    (DEFAULT_FOV_DEG.to_radians() * 0.5).tan() / (fov_deg.to_radians() * 0.5).tan()
+}
 /// Near plane in Earth radii (5 km): well inside the lowest orbit's altitude.
 const NEAR_RE: f32 = 0.000_8;
 const FAR_RE: f32 = 60.0;
@@ -94,7 +99,7 @@ fn direction(look: Look, sol: &Solution) -> (Vec3, Vec3) {
 }
 
 /// The globe scene seen from the vehicle: camera at its position, looking per `look`.
-pub fn build_scene(look: Look, sol: &Solution, aspect: f32) -> GlobeScene {
+pub fn build_scene(look: Look, sol: &Solution, aspect: f32, fov_deg: f32) -> GlobeScene {
     let cam_pos = to_vec3(sol.state_gcrf.r.into());
     let (dir, mut up) = direction(look, sol);
     if dir.dot(up).abs() > 0.999 {
@@ -102,7 +107,7 @@ pub fn build_scene(look: Look, sol: &Solution, aspect: f32) -> GlobeScene {
     }
     let view = glam::camera::rh::view::look_at_mat4(cam_pos, cam_pos + dir, up);
     let proj = glam::camera::rh::proj::directx::perspective(
-        FOV_DEG.to_radians(),
+        fov_deg.clamp(MIN_FOV_DEG, DEFAULT_FOV_DEG).to_radians(),
         aspect.max(0.01),
         NEAR_RE,
         FAR_RE,

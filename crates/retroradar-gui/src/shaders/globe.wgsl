@@ -20,6 +20,7 @@ struct U {
     viewport: vec4<f32>,     // xy: viewport size px; z: ERA rad; w: 1 = mono mode
     shade: vec4<f32>,        // x: ambient; y: terminator half-width (N.L); z: orbit width px; w: marker size px
     orbit_dash: vec4<f32>,   // x: dashes per revolution; y: duty (0..1)
+    detail_bounds: vec4<f32>, // origin uv, span uv; zero span disables detail
 }
 
 @group(0) @binding(0) var<uniform> u: U;
@@ -28,6 +29,7 @@ struct U {
 @group(0) @binding(3) var coast_tex: texture_2d<f32>;
 @group(0) @binding(4) var samp: sampler;
 @group(0) @binding(5) var night_tex: texture_2d<f32>;
+@group(0) @binding(6) var detail_tex: texture_2d<f32>;
 
 const PI: f32 = 3.14159265358979;
 /// Graticule spacing in degrees of latitude and longitude.
@@ -75,9 +77,8 @@ fn wrapped(d: vec2<f32>) -> vec2<f32> {
 @fragment
 fn fs_sphere(in: FullOut) -> FsOut {
     let n0 = u.inv_view_proj * vec4<f32>(in.ndc, 0.0, 1.0);
-    let n1 = u.inv_view_proj * vec4<f32>(in.ndc, 1.0, 1.0);
     let o = u.cam_pos.xyz;
-    let dir = normalize(n1.xyz / n1.w - n0.xyz / n0.w);
+    let dir = normalize(n0.xyz / n0.w - o);
 
     let b = dot(o, dir);
     let c = dot(o, o) - 1.0;
@@ -94,7 +95,14 @@ fn fs_sphere(in: FullOut) -> FsOut {
     let uv = vec2<f32>(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI);
     let dx = wrapped(dpdx(uv));
     let dy = wrapped(dpdy(uv));
-    let albedo = textureSampleGrad(earth_tex, samp, uv, dx, dy).rgb;
+    let base_albedo = textureSampleGrad(earth_tex, samp, uv, dx, dy).rgb;
+    let span = max(u.detail_bounds.zw, vec2<f32>(1e-8));
+    let local_uv = vec2<f32>(fract(uv.x - u.detail_bounds.x), uv.y - u.detail_bounds.y) / span;
+    let edge = min(local_uv, vec2<f32>(1.0) - local_uv);
+    let detail_weight = smoothstep(0.0, 0.004, min(edge.x, edge.y)) * select(0.0, 1.0, u.detail_bounds.z > 0.0);
+    let detail = textureSampleGrad(detail_tex, samp, clamp(local_uv, vec2<f32>(0.000245), vec2<f32>(0.999755)), dx / span, dy / span);
+    // Transparent/no-data tiles retain the embedded global map.
+    let albedo = mix(base_albedo, detail.rgb / max(detail.a, 1e-6), detail.a * detail_weight);
     let coast = textureSampleGrad(coast_tex, samp, uv, dx, dy).r;
     let lights = textureSampleGrad(night_tex, samp, uv, dx, dy).rgb;
 

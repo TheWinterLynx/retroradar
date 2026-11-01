@@ -97,6 +97,9 @@ struct Cli {
     /// Software rendering and GPU dimension limits reduce the effective resolution.
     #[arg(long, global = true, default_value = "auto")]
     earth_quality: retroradar_gui::EarthQuality,
+    /// Disable regional Sentinel-2 detail downloads (global embedded imagery only).
+    #[arg(long, global = true)]
+    no_earth_detail: bool,
     /// For `shot` and `bench`: run on a software (CPU) graphics adapter instead of refusing to. The window
     /// always accepts one, with a warning.
     #[arg(long, global = true)]
@@ -661,6 +664,8 @@ fn main() -> Result<()> {
                     },
                     earth_quality: cli.earth_quality,
                     low_power: cli.low_power,
+                    earth_detail: !cli.no_earth_detail,
+                    detail_offline: cli.offline || cli.replay.is_some(),
                     max_fps: cli.max_fps.or(cli.pi.then_some(PI_MAX_FPS)),
                     exit_after_frames: g.exit_after_frames,
                     start_theme: g.theme,

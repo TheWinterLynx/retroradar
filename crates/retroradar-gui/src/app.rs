@@ -20,7 +20,6 @@ use crate::theme::Theme;
 
 /// Zoom factor per wheel notch; mouse drag gain.
 const ZOOM_STEP: f32 = 1.15;
-const DRAG_DEG_PER_PX: f32 = 0.3;
 
 /// Frames after which the GPU is assumed to have left its low-clock idle state (see the gfx report).
 const SLOW_FRAME_WARMUP: usize = 150;
@@ -40,6 +39,8 @@ pub struct Options {
     pub present: Present,
     pub low_power: bool,
     pub earth_quality: crate::EarthQuality,
+    pub earth_detail: bool,
+    pub detail_offline: bool,
     /// Cap the frame rate, leaving the rest of the CPU to the engine and sources (the Pi display does).
     pub max_fps: Option<f32>,
     pub exit_after_frames: Option<u64>,
@@ -58,6 +59,7 @@ struct Running {
     console: Console,
     egui_state: egui_winit::State,
     gpu: Arc<Gpu>,
+    terrain: Option<crate::terrain::Stream>,
 }
 
 struct App {
@@ -210,6 +212,12 @@ impl App {
             console,
             egui_state,
             gpu,
+            terrain: self
+                .opts
+                .earth_detail
+                .then(|| retroradar_core::config::cache_dir())
+                .flatten()
+                .map(|cache| crate::terrain::Stream::new(cache, self.opts.detail_offline)),
         });
         Ok(())
     }
@@ -245,6 +253,14 @@ impl App {
         let world = self.opts.live.bus.latest();
         let mut prepared = r.console.prepare(raw, size, &world, &stats);
         self.interactive = prepared.interactive_rect_px;
+        if let Some(terrain) = &mut r.terrain {
+            terrain.tick(
+                prepared.scene.as_ref(),
+                r.renderer.globe_mut(),
+                &r.gpu.queue,
+            );
+            r.console.earth_detail_status = terrain.status.clone();
+        }
 
         let acquire_start = Instant::now();
         let frame = match r.surface.get_current_texture() {
@@ -406,9 +422,10 @@ impl ApplicationHandler for App {
                 if let (true, Some(prev), Some(r)) =
                     (self.dragging, self.last_cursor, self.running.as_mut())
                 {
-                    r.console.orbit_input_by(
-                        -(now.0 - prev.0) * DRAG_DEG_PER_PX,
-                        (now.1 - prev.1) * DRAG_DEG_PER_PX,
+                    r.console.drag_by_pixels(
+                        now.0 - prev.0,
+                        now.1 - prev.1,
+                        self.interactive.map_or(1.0, |area| area[3] as f32),
                     );
                 }
                 self.last_cursor = Some(now);
@@ -422,7 +439,7 @@ impl ApplicationHandler for App {
                     inside(self.interactive, self.last_cursor),
                     self.running.as_mut(),
                 ) {
-                    r.console.camera.zoom_by(ZOOM_STEP.powf(-notches));
+                    r.console.zoom_by(ZOOM_STEP.powf(-notches));
                 }
             }
             WindowEvent::ModifiersChanged(m) => self.shift = m.state().shift_key(),

@@ -99,6 +99,26 @@ Las imágenes NASA se han reducido desde originales mayores, sin ampliar píxele
 Son mapas estáticos de 2004 (día) y 2012 (noche). Véase
 [Globo HD](docs/R01-HD-EARTH-v1.0.md) para fuentes, memoria y aceptación.
 
+## Zoom con detalle regional
+
+El globo permite acercarse hasta **10 km sobre la superficie**. En VIEW/NADIR,
+la rueda o `+`/`-` cambian el zoom óptico entre **1× y 100×**, manteniendo la altitud
+real del vehículo. El control se hace más lento según te acercas.
+
+Las zonas cercanas cargan teselas **Sentinel-2 de EOX, edición 2016**, hasta unos
+**10 m por píxel** según encuadre y cobertura. Se muestran progresivamente; el mapa
+global cubre las teselas que todavía no han llegado. La primera visita necesita
+conexión y puede tardar varios segundos. Las zonas descargadas quedan en caché.
+Son fotografías históricas diurnas, con sombreado según el Sol; las luces nocturnas
+siguen usando el mapa global. No hay relieve 3D ni un nivel de detalle ilimitado.
+
+En VIEW puedes pausar con **Espacio** para inspeccionar una zona sin que el vehículo
+siga avanzando. El contador `DETAIL` muestra nivel, resolución de la cuadrícula y
+teselas cargadas. `--offline` usa solo la caché; `--no-earth-detail` conserva solo
+las texturas globales. El caché de detalle se limita aproximadamente a 256 MiB y
+la textura regional ocupa 16 MiB adicionales de GPU. Créditos y licencia CC BY 4.0
+se muestran sobre la vista. [Detalle regional](docs/R01-REGIONAL-EARTH-v1.0.md).
+
 ## Datos y configuración
 
 ```powershell

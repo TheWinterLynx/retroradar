@@ -10,7 +10,7 @@ to disable recording. `--offline` uses cached data; unavailable data stays NO DA
 | Tab / Shift-Tab | Next / previous subpage |
 | T / V | Theme / vehicle |
 | Space / [ / ] / 0 | Pause / reduce warp / increase warp / live time |
-| Mouse drag / wheel | Rotate / zoom the orbit map; rotation slows as you zoom in |
+| Mouse drag / wheel | Rotate / zoom the orbit map; VIEW wheel changes optical zoom; rotation slows as you zoom in |
 | ? / Q | Help / quit |
 | : | Console commands; Tab completes |
 
@@ -29,8 +29,9 @@ Full legal and dependency notices are available through `retroradar about`.
 
 Mouse drag and arrow-key rotation share zoom sensitivity. Earth focus scales by
 height above the surface; vehicle focus scales by distance to the vehicle. The
-default overview speed is retained; the closest Earth view is about ten times
-slower. VIEW free-look has a fixed field of view and retains its look sensitivity.
+default overview speed is retained; the closest Earth views use progressively smaller angular steps. Drag
+sensitivity also follows viewport height, for consistent control at 1080p and 4K. VIEW free-look sensitivity follows its own optical field of view, independently
+of the orbit-map distance.
 Kiosk's programmed angular drift and the simulation clock are unaffected.
 
 All 3D Earth views, including VIEW/NADIR, share the selected `--earth-quality`
@@ -39,3 +40,14 @@ Close views still magnify finite-resolution imagery: night 8K has about 4.9 km p
 texel at the equator. The coastline annotation fades when a mask texel spans
 1–4 screen pixels, avoiding broad stair-stepped outlines over the actual image.
 This does not create additional ground detail.
+
+Regional detail is enabled in the desktop window by default: EOX Sentinel-2 2016
+CC BY 4.0, up to roughly 10 m per pixel. It loads only the selected nearby area on
+a worker and keeps a bounded cache. The globe reaches 10 km above the reference
+sphere; VIEW optical zoom reaches 100× without changing vehicle altitude. Use
+Space to hold the simulation while inspecting a site. The surface is still the
+reference sphere, without a terrain elevation model.
+
+`--offline` / startup `--replay` use only cached tiles; `--no-earth-detail` disables regional
+loading. The independent headless `shot` / `bench` tools use the global imagery
+for repeatable captures and measurements. See `R01-REGIONAL-EARTH-v1.0.md`.

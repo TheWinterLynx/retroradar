@@ -90,6 +90,7 @@ pub struct Console {
     pub theme_idx: usize,
     pub toggles: EffectToggles,
     pub camera: Camera,
+    pub earth_detail_status: Option<String>,
     pub vehicle_id: String,
     pub show_ecef: bool,
     pub page: Page,
@@ -224,6 +225,7 @@ impl Console {
             theme_idx,
             toggles,
             camera: Camera::default(),
+            earth_detail_status: None,
             vehicle_id,
             show_ecef: false,
             page: Page::Master,
@@ -511,11 +513,33 @@ impl Console {
         Outcome::Continue
     }
 
-    /// All manual orbit inputs share zoom sensitivity. VIEW free-look has a fixed
-    /// field of view, so an orbit-map distance must not alter its yaw/pitch speed.
+    pub fn zoom_by(&mut self, factor: f32) {
+        if self.page == Page::View {
+            self.camera.window_fov_deg = (self.camera.window_fov_deg * factor)
+                .clamp(crate::window::MIN_FOV_DEG, crate::window::DEFAULT_FOV_DEG);
+        } else {
+            self.camera.zoom_by(factor);
+        }
+    }
+
+    pub fn drag_by_pixels(&mut self, dx: f32, dy: f32, height: f32) {
+        if self.page == Page::View {
+            let base = 2.0
+                * (crate::window::DEFAULT_FOV_DEG.to_radians() * 0.5).tan()
+                * (180.0 / std::f32::consts::PI)
+                / height.max(1.0);
+            self.orbit_input_by(-dx * base, dy * base);
+        } else {
+            self.camera.drag_by_pixels(dx, dy, height);
+        }
+    }
+
+    /// All manual orbit inputs share zoom sensitivity. VIEW free-look follows its
+    /// own field of view; orbit-map distance must not alter its yaw/pitch speed.
     pub fn orbit_input_by(&mut self, az_deg: f32, el_deg: f32) {
         if self.page == Page::View {
-            self.camera.orbit_by(az_deg, el_deg);
+            let scale = 1.0 / crate::window::magnification(self.camera.window_fov_deg);
+            self.camera.orbit_by(az_deg * scale, el_deg * scale);
         } else {
             self.camera.orbit_input_by(az_deg, el_deg);
         }
@@ -541,8 +565,8 @@ impl Console {
             KeyAction::Altitude => self.camera.cycle_exaggeration(),
             KeyAction::CameraFrame => self.camera.earth_fixed = !self.camera.earth_fixed,
             KeyAction::Focus => self.camera.focus_vehicle = !self.camera.focus_vehicle,
-            KeyAction::ZoomIn => self.camera.zoom_by(1.0 / ZOOM_STEP),
-            KeyAction::ZoomOut => self.camera.zoom_by(ZOOM_STEP),
+            KeyAction::ZoomIn => self.zoom_by(1.0 / ZOOM_STEP),
+            KeyAction::ZoomOut => self.zoom_by(ZOOM_STEP),
             KeyAction::Scanlines => self.toggles.scanlines = !self.toggles.scanlines,
             KeyAction::Bloom => self.toggles.bloom = !self.toggles.bloom,
             KeyAction::Persistence => self.toggles.persistence = !self.toggles.persistence,
@@ -829,7 +853,7 @@ impl Console {
             .window
             .map(|_| crate::window::Look::from_sub(self.sub, &self.camera));
         let scene = sol.filter(|_| has_area).map(|s| match window_look {
-            Some(look) => crate::window::build_scene(look, s, aspect),
+            Some(look) => crate::window::build_scene(look, s, aspect, self.camera.window_fov_deg),
             None => build_scene(&self.camera, s, aspect),
         });
         let moon = window_look.and_then(|_| {
@@ -947,6 +971,35 @@ impl Console {
                 Pos2::new(gx as f32, gy as f32),
                 egui::vec2(gw as f32, gh as f32),
             ));
+            if has_area && self.page == Page::View {
+                globe_painter.text(
+                    egui::pos2(
+                        (globe_px[0] + globe_px[2]) as f32 - 8.0,
+                        globe_px[1] as f32 + 8.0,
+                    ),
+                    egui::Align2::RIGHT_TOP,
+                    format!(
+                        "OPTICAL ZOOM {:.1}x",
+                        crate::window::magnification(self.camera.window_fov_deg)
+                    ),
+                    egui::FontId::monospace(14.0),
+                    theme.palette.bright.to_egui(),
+                );
+            }
+            if has_area && let Some(status) = &self.earth_detail_status {
+                let text = format!("{status}\n{}", retroradar_sources::earth::ATTRIBUTION);
+                let at = egui::pos2(
+                    globe_px[0] as f32 + 8.0,
+                    (globe_px[1] + globe_px[3]) as f32 - 8.0,
+                );
+                globe_painter.text(
+                    at,
+                    egui::Align2::LEFT_BOTTOM,
+                    text,
+                    egui::FontId::monospace(11.0),
+                    theme.palette.bright.to_egui(),
+                );
+            }
             if let (Some(sc), Some(sol), Some(_), true) =
                 (scene.as_ref(), sol, window_look, has_area)
             {
@@ -1298,6 +1351,29 @@ mod tests {
         let before = c.camera.azimuth_deg;
         c.handle_key(KeyInput::Right, &w);
         assert!((c.camera.azimuth_deg - before - ARROW_STEP_DEG).abs() < 1e-4);
+    }
+
+    #[test]
+    fn view_zoom_changes_optics_and_look_sensitivity_without_changing_orbital_distance() {
+        let (mut c, _rx) = console();
+        c.page = Page::View;
+        let distance = c.camera.dist_earth_re;
+        for _ in 0..100 {
+            c.zoom_by(0.8);
+        }
+        assert_eq!(c.camera.window_fov_deg, crate::window::MIN_FOV_DEG);
+        assert_eq!(c.camera.dist_earth_re, distance);
+        let before = c.camera.azimuth_deg;
+        c.orbit_input_by(5.0, 0.0);
+        assert!((c.camera.azimuth_deg - before) < 0.1);
+        for _ in 0..100 {
+            c.zoom_by(1.2);
+        }
+        assert_eq!(c.camera.window_fov_deg, crate::window::DEFAULT_FOV_DEG);
+        c.page = Page::Master;
+        c.zoom_by(0.5);
+        assert!(c.camera.dist_earth_re < distance);
+        assert_eq!(c.camera.window_fov_deg, crate::window::DEFAULT_FOV_DEG);
     }
 
     #[test]

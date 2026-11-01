@@ -34,6 +34,8 @@ try {
     Step 'Horizons request scheduling' { cargo test --locked -p retroradar-sources tasks::tests }
     Step 'Earth quality and real asset dimensions' { cargo test --locked -p retroradar-gui earth::tests }
     Step 'HD JPEG decode (16K day / 8K night)' { cargo test --locked -p retroradar-gui high_source_decodes_without_upscaling -- --ignored --nocapture }
+    Step 'Regional imagery cache and projection' { cargo test --locked -p retroradar-sources earth::tests; if ($LASTEXITCODE -ne 0) { throw 'Earth tile source tests failed.' }; cargo test --locked -p retroradar-gui terrain::tests }
+    Step 'Close camera and VIEW zoom' { cargo test --locked -p retroradar-gui close_camera_reaches_ten_km; if ($LASTEXITCODE -ne 0) { throw 'Close camera test failed.' }; cargo test --locked -p retroradar-gui view_zoom_changes_optics }
     Step 'Workspace regressions' { cargo test --locked --workspace --all-targets }
     Step 'Lockfile unchanged after Cargo' { git diff --exit-code -- Cargo.lock }
     Step 'Release binary' { cargo build --locked --release --bin retroradar }
@@ -43,6 +45,7 @@ try {
     if (-not $SkipGpu) {
         try {
             Step 'Close-view coastline GPU regression' { cargo test --locked -p retroradar-gui coast_overlay_fades_in_close_view_but_remains_in_overview -- --ignored --nocapture }
+            Step 'Regional imagery GPU alignment and no-data fallback' { cargo test --locked -p retroradar-gui regional_imagery_aligns_with_ground_and_preserves_missing_tile_fallback -- --ignored --nocapture }
             Step 'Windows HD GPU/window smoke (120 frames)' { & .\target\release\retroradar.exe --data-dir $portable --offline --no-record --earth-quality high --size 1280x720 --exit-after-frames 120 }
         } finally {
             if (Test-Path $portable) { Remove-Item -Recurse -Force $portable }

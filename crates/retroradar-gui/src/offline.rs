@@ -951,6 +951,126 @@ mod tests {
             println!("Coast-affected pixels overview / nadir: {counts:?}");
         }
 
+        #[test]
+        #[ignore = "needs a GPU; uses only bundled CC BY 4.0 imagery, no network"]
+        fn regional_imagery_aligns_with_ground_and_preserves_missing_tile_fallback() {
+            use retroradar_core::state::{Quality, SourceKind, State};
+            use retroradar_core::world::Solution;
+            let live = live();
+            let mut world = (*live.bus.latest()).clone();
+            let (lat, lon) = (
+                (90.0_f64 - 2257.5 / 8192.0 * 180.0).to_radians(),
+                (8023.5_f64 / 16384.0 * 360.0 - 180.0).to_radians(),
+            );
+            let r = 6378.137 + 420.0;
+            let state = State::new(
+                [
+                    r * lat.cos() * lon.cos(),
+                    r * lat.cos() * lon.sin(),
+                    r * lat.sin(),
+                ],
+                [-7.6 * lon.sin(), 7.6 * lon.cos(), 0.0],
+            );
+            world.vehicles[0].solution = Some(Solution {
+                source: SourceKind::Gp,
+                quality: Quality::Pred,
+                state_gcrf: state,
+                state_itrf: state,
+                geodetic: retroradar_astro::kepler::geodetic(&state.r),
+                elements: retroradar_astro::kepler::elements(&state).unwrap(),
+                sun_gcrf_km: [1.5e8, 0.0, 0.0],
+                beta_deg: 0.0,
+                illumination: 1.0,
+                gmst_rad: 0.0,
+                ecef_from_gcrf: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            });
+            live.bus.publish(world);
+            let mut off = Offline::new(
+                &live,
+                crate::theme::embedded().unwrap(),
+                Some("modern"),
+                [1920, 1080],
+                false,
+                true,
+                crate::EarthQuality::Low,
+            )
+            .unwrap();
+            off.console.page = crate::pages::Page::View;
+            off.console.sub = 0;
+            off.console.camera.window_fov_deg = crate::window::MIN_FOV_DEG;
+            off.console.toggles = EffectToggles::all(false);
+            off.console.earth_detail_status =
+                Some("OFFLINE REGRESSION FIXTURE | EOX S2 2016".into());
+            off.frame(4, 16.7).unwrap();
+            off.frame(4, 16.7).unwrap();
+            let base = off.capture().unwrap();
+            let tile = image::load_from_memory(include_bytes!(
+                "../fixtures/earth/s2-2016-z13-y2257-x8023.jpg"
+            ))
+            .unwrap()
+            .to_rgba8();
+            let mut patch =
+                image::RgbaImage::new(crate::terrain::PATCH_SIZE, crate::terrain::PATCH_SIZE);
+            image::imageops::replace(&mut patch, &tile, 3 * 256, 3 * 256);
+            let bounds = crate::terrain::Key {
+                level: 13,
+                x: 8020,
+                y: 2254,
+            }
+            .bounds();
+            off.renderer
+                .globe_mut()
+                .upload_detail(&off.gpu.queue, &patch, bounds);
+            off.frame(4, 16.7).unwrap();
+            let detail = off.capture().unwrap();
+            let differences = |a: &image::RgbaImage, b: &image::RgbaImage| {
+                (100..960)
+                    .flat_map(|y| (0..1920).map(move |x| (x, y)))
+                    .filter(|&(x, y)| {
+                        a.get_pixel(x, y)
+                            .0
+                            .iter()
+                            .zip(b.get_pixel(x, y).0)
+                            .take(3)
+                            .any(|(a, b)| a.abs_diff(b) > 8)
+                    })
+                    .count()
+            };
+            let changed = differences(&base, &detail);
+            assert!(
+                changed > 1000 && changed < 1920 * 860 / 2,
+                "native tile must change its own ground region: {changed}"
+            );
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/earth-detail-v1.0");
+            std::fs::create_dir_all(&dir).unwrap();
+            base.save(dir.join("base.png")).unwrap();
+            detail.save(dir.join("regional.png")).unwrap();
+            off.renderer.globe_mut().upload_detail(
+                &off.gpu.queue,
+                &patch,
+                [0.0, 0.0, bounds[2], bounds[3]],
+            );
+            off.frame(4, 16.7).unwrap();
+            assert_eq!(
+                differences(&base, &off.capture().unwrap()),
+                0,
+                "distant patch cannot paint Madrid"
+            );
+            patch.fill(0);
+            off.renderer
+                .globe_mut()
+                .upload_detail(&off.gpu.queue, &patch, bounds);
+            off.frame(4, 16.7).unwrap();
+            assert_eq!(
+                differences(&base, &off.capture().unwrap()),
+                0,
+                "transparent no-data must retain the global map"
+            );
+            println!(
+                "Native regional tile changed {changed} pixels in its geographic bounds; no-data fallback matched the base."
+            );
+        }
+
         /// Renders fixed pages from a fixed world and compares them with `tests/golden`. Needs a GPU adapter,
         /// and a software one is fine: `cargo test -p retroradar-gui golden -- --ignored`. After an intended change
         /// to how things look, `RETRORADAR_BLESS=1` rewrites the golden images; review them in the diff.
